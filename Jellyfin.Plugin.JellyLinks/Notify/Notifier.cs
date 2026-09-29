@@ -30,14 +30,20 @@ public sealed class Notifier
             _log.LogError(ex, "[JellyLinks] activity log write failed for {Kind}", e.Kind);
         }
 
-        using var req = WebhookFormatter.Build(_config(), e);
-        if (req is null)
-        {
-            return;
-        }
+        // fire-and-forget: a slow webhook must never delay a download
+        _ = SendWebhookAsync(e);
+    }
 
+    private async Task SendWebhookAsync(LinkEvent e)
+    {
         try
         {
+            using var req = WebhookFormatter.Build(_config(), e);
+            if (req is null)
+            {
+                return;
+            }
+
             using var client = _http.CreateClient("JellyLinks");
             client.Timeout = TimeSpan.FromSeconds(10);
             using var res = await client.SendAsync(req).ConfigureAwait(false);

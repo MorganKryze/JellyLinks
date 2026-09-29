@@ -83,6 +83,7 @@ public sealed class FileGate
 
         // 6. addresses
         var isNew = !_store.BatchHasIp(batch.Id, ip);
+        string? newIpDetail = null;
         if (isNew)
         {
             var limit = batch.IpLimitOverride ?? _config().IpLimit;
@@ -95,7 +96,7 @@ public sealed class FileGate
                 return Deny(GateOutcome.Forbidden, link, batch);
             }
 
-            await Publish(EventKind.NewIp, batch, $"adresse {ip} ({distinct}/{(limit > 0 ? limit : "∞")})").ConfigureAwait(false);
+            newIpDetail = $"adresse {ip} ({distinct}/{(limit > 0 ? limit : "∞")})";
         }
 
         // 7. quota
@@ -104,6 +105,11 @@ public sealed class FileGate
         {
             await Publish(EventKind.QuotaReached, batch, $"{q.UsedBytes} octets sur {q.Quota.VolumeBytes} ({q.Quota.PeriodDays} j)").ConfigureAwait(false);
             return Deny(GateOutcome.TooManyRequests, link, batch);
+        }
+
+        if (newIpDetail is not null)
+        {
+            await Publish(EventKind.NewIp, batch, newIpDetail).ConfigureAwait(false);
         }
 
         return new GateResult(GateOutcome.Serve, link, batch, path, isNew);

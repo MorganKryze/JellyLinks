@@ -128,6 +128,16 @@ public sealed class FileGateTests : IDisposable
     }
 
     [Fact]
+    public async Task Refused_new_address_on_exhausted_quota_emits_no_new_ip_event()
+    {
+        _cfg.QuotaEnabled = true;
+        _cfg.QuotaVolumeBytes = 100;
+        _t.Store.AddUsage(User, 1_800_000_000 / 86_400, 100);
+        Assert.Equal(GateOutcome.TooManyRequests, (await _gate.CheckAsync(Token(), "5.5.5.5", false)).Outcome);
+        Assert.DoesNotContain(_sink.Events, e => e.Kind == EventKind.NewIp);
+    }
+
+    [Fact]
     public async Task Head_skips_address_and_quota_checks()
     {
         _cfg.QuotaEnabled = true;
