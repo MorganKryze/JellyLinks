@@ -99,7 +99,12 @@
       d.content.replaceChildren.apply(d.content, rows);
       d.footer.replaceChildren(
         action('Télécharger .txt', false, t.units === 0 || !!s.pending, function () {
-          withBatch(function (b) { JL.downloadText(JL.txtName(b.Label), JL.linksText(b)); done(b, 'Fichier .txt téléchargé.'); });
+          withBatch(function (b) {
+            // Jellyfin app shells (WebViews) ignore blob downloads: show the links as text instead.
+            if (window.NativeShell) { manual(b, "Enregistrer un fichier n'est pas possible ici : les liens sont ci-dessous, sélectionne-les et copie-les."); return; }
+            JL.downloadText(JL.txtName(b.Label), JL.linksText(b));
+            done(b, 'Fichier .txt téléchargé.');
+          });
         }),
         action('Copier les liens', true, t.units === 0 || !!s.pending, function () {
           withBatch(function (b) {
@@ -135,9 +140,9 @@
         el('div', { className: 'jlMuted', text: JL.labelTitle(b.Label) + " · valable jusqu'au " + JL.formatDate(b.ExpiresAt) + ' · retrouve ce lot dans « Mes liens ».' }));
     }
 
-    function manual(b) {
+    function manual(b, text) {
       d.content.replaceChildren(
-        el('div', { className: 'jlMsg', text: 'Copie automatique impossible ici : sélectionne le texte ci-dessous et copie-le.' }),
+        el('div', { className: 'jlMsg', text: text || 'Copie automatique impossible ici : sélectionne le texte ci-dessous et copie-le.' }),
         el('textarea', { className: 'jlManual', value: JL.linksText(b), attrs: { readonly: '' } }));
     }
 
