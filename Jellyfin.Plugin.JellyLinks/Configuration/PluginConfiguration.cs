@@ -31,4 +31,7 @@ public class PluginConfiguration : BasePluginConfiguration
 
     /// <summary>Base64 HMAC key. Generated on first start; rotating it revokes every link.</summary>
     public string SigningSecret { get; set; } = string.Empty;
+
+    /// <summary>Public address used to build links, e.g. https://jellyfin.example. Empty: taken from the request.</summary>
+    public string PublicBaseUrl { get; set; } = string.Empty;
 }

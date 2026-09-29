@@ -20,4 +20,16 @@ public class LinkUrlBuilderTests
     {
         Assert.Equal("https://h.example/jf/JellyLinks/f/T/a.mkv", LinkUrlBuilder.Build("https://h.example/jf", "T", "a.mkv"));
     }
+
+    [Theory]
+    [InlineData("", "http://10.0.0.5:8096", "http://10.0.0.5:8096")]
+    [InlineData("  ", "http://10.0.0.5:8096", "http://10.0.0.5:8096")]
+    [InlineData("https://jellyfin.example", "http://10.0.0.5:8096", "https://jellyfin.example")]
+    [InlineData(" https://jellyfin.example/jf/ ", "http://x", "https://jellyfin.example/jf/")]
+    [InlineData("javascript:alert(1)", "http://x", "http://x")]
+    [InlineData("jellyfin.example", "http://x", "http://x")]
+    public void Public_base_url_wins_only_when_it_is_an_absolute_http_url(string configured, string request, string expected)
+    {
+        Assert.Equal(expected, LinkUrlBuilder.BaseUrl(configured, request));
+    }
 }

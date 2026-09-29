@@ -6,6 +6,10 @@ public static class BatchStates
     public const string Blocked = "blocked";
     public const string Revoked = "revoked";
     public const string Expired = "expired";
+
+    /// <summary>State as a reader should see it: past its expiry, an active or blocked batch is expired even before maintenance runs.</summary>
+    public static string Effective(string state, long expiresAt, long now) =>
+        (state == Active || state == Blocked) && expiresAt <= now ? Expired : state;
 }
 
 public static class SessionStatuses

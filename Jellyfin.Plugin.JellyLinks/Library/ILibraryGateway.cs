@@ -12,7 +12,8 @@ public sealed record ResolvedFile(
     int? SeasonNumber,
     int? EpisodeNumber,
     string? VersionName,
-    bool Played);
+    bool Played,
+    string? ItemName = null);
 
 /// <summary>Everything the plugin needs from Jellyfin, behind one seam.</summary>
 public interface ILibraryGateway

@@ -57,7 +57,8 @@ public sealed class JellyfinLibraryGateway : ILibraryGateway
             }
         }
 
-        return files;
+        // An alternate version can also come back as its own item: keep each file once.
+        return files.DistinctBy(f => (f.MediaSourceId, f.StreamIndex)).ToList();
     }
 
     public string? ResolvePath(Guid userId, Guid itemId, string mediaSourceId, int? streamIndex)
@@ -129,7 +130,7 @@ public sealed class JellyfinLibraryGateway : ILibraryGateway
 
             yield return new ResolvedFile(Guid.Parse(source.Id), source.Id, Path.GetFileName(source.Path),
                 source.Size ?? new FileInfo(source.Path).Length, "video", null, title,
-                episode?.ParentIndexNumber, episode?.IndexNumber, source.Name, played);
+                episode?.ParentIndexNumber, episode?.IndexNumber, source.Name, played, episode?.Name);
 
             if (!includeSubtitles)
             {
@@ -140,7 +141,7 @@ public sealed class JellyfinLibraryGateway : ILibraryGateway
             {
                 yield return new ResolvedFile(Guid.Parse(source.Id), source.Id, Path.GetFileName(sub.Path),
                     new FileInfo(sub.Path).Length, "subtitle", sub.Index, title,
-                    episode?.ParentIndexNumber, episode?.IndexNumber, source.Name, played);
+                    episode?.ParentIndexNumber, episode?.IndexNumber, source.Name, played, episode?.Name);
             }
         }
     }

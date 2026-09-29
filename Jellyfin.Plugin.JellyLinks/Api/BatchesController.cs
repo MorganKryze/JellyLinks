@@ -17,7 +17,7 @@ public sealed record CreateBatchRequest(
     IReadOnlyList<Guid>? ExcludedItemIds, IReadOnlyList<string>? ExcludedMediaSourceIds);
 
 public sealed record FileView(Guid ItemId, string MediaSourceId, string FileName, long Size, string Kind,
-    int? SeasonNumber, int? EpisodeNumber, string Title, string? VersionName, bool Played);
+    int? SeasonNumber, int? EpisodeNumber, string Title, string? VersionName, bool Played, string? ItemName);
 
 public sealed record QuotaView(bool Enabled, long UsedBytes, long VolumeBytes, int PeriodDays, int ActiveBatches, int MaxActiveBatches);
 
@@ -88,11 +88,14 @@ public sealed class BatchesController : ControllerBase
         var q = _quotas.GetStatus(UserId);
         return new PreviewResponse(
             files.Select(f => new FileView(f.ItemId, f.MediaSourceId, f.FileName, f.Size, f.Kind, f.SeasonNumber,
-                f.EpisodeNumber, f.Title, f.VersionName, f.Played)).ToList(),
+                f.EpisodeNumber, f.Title, f.VersionName, f.Played, f.ItemName)).ToList(),
             files.Sum(f => f.Size),
             Now + (_config().LinkValidityDays * 86_400L),
             ToView(q));
     }
+
+    [HttpGet("quota")]
+    public ActionResult<QuotaView> Quota() => ToView(_quotas.GetStatus(UserId));
 
     [HttpPost]
     public ActionResult<BatchResponse> Create([FromBody] CreateBatchRequest req)
@@ -115,7 +118,7 @@ public sealed class BatchesController : ControllerBase
             return NotFound();
         }
 
-        if (b.State == BatchStates.Active)
+        if (BatchStates.Effective(b.State, b.ExpiresAt, Now) == BatchStates.Active)
         {
             _store.SetBatchState(id, BatchStates.Revoked, "révoqué par l'utilisateur");
         }
@@ -132,7 +135,7 @@ public sealed class BatchesController : ControllerBase
             return NotFound();
         }
 
-        if (b.State == BatchStates.Blocked)
+        if (BatchStates.Effective(b.State, b.ExpiresAt, Now) == BatchStates.Blocked)
         {
             return StatusCode(StatusCodes.Status403Forbidden, "blocked: only an administrator can release it");
         }
@@ -164,6 +167,8 @@ public sealed class BatchesController : ControllerBase
 
     private BatchResponse ToResponse(BatchRecord b)
     {
+        var state = BatchStates.Effective(b.State, b.ExpiresAt, Now);
+        var baseUrl = LinkUrlBuilder.BaseUrl(_config().PublicBaseUrl, $"{Request.Scheme}://{Request.Host}{Request.PathBase}");
         var links = _store.GetLinks(b.Id);
         var views = new List<LinkView>();
         var complete = 0;
@@ -175,13 +180,11 @@ public sealed class BatchesController : ControllerBase
                 complete++;
             }
 
-            var url = b.State == BatchStates.Active && b.ExpiresAt > Now
-                ? LinkUrlBuilder.Build($"{Request.Scheme}://{Request.Host}{Request.PathBase}", Signer.Sign(l.Id, b.ExpiresAt), l.FileName)
-                : string.Empty;
+            var url = state == BatchStates.Active ? LinkUrlBuilder.Build(baseUrl, Signer.Sign(l.Id, b.ExpiresAt), l.FileName) : string.Empty;
             views.Add(new LinkView(l.FileName, l.Size, l.Kind, url, s?.Status ?? "pending", s?.BytesSent ?? 0));
         }
 
-        return new BatchResponse(b.Id, b.Label, b.CreatedAt, b.ExpiresAt, b.State, links.Count, links.Sum(l => l.Size), complete, views);
+        return new BatchResponse(b.Id, b.Label, b.CreatedAt, b.ExpiresAt, state, links.Count, links.Sum(l => l.Size), complete, views);
     }
 
     private static QuotaView ToView(QuotaStatus q) =>
