@@ -28,11 +28,15 @@ public static class WebhookFormatter
             return req;
         }
 
-        req.Headers.Add("Title", $"JellyLinks : {Title(e.Kind)}");
+        req.Headers.Add("Title", HeaderValue($"JellyLinks : {Title(e.Kind)}"));
         req.Headers.Add("Tags", Tags(e.Kind));
         req.Content = new StringContent($"{e.UserName} · {e.BatchLabel}\n{e.Detail}", Encoding.UTF8, "text/plain");
         return req;
     }
+
+    /// <summary>HTTP headers are ASCII only: anything else goes as RFC 2047, which ntfy decodes.</summary>
+    internal static string HeaderValue(string value) =>
+        Ascii.IsValid(value) ? value : $"=?UTF-8?B?{Convert.ToBase64String(Encoding.UTF8.GetBytes(value))}?=";
 
     private static bool IsEnabled(PluginConfiguration c, EventKind k) => k switch
     {

@@ -1,3 +1,6 @@
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using Jellyfin.Plugin.JellyLinks.Configuration;
 using Jellyfin.Plugin.JellyLinks.Notify;
 using Xunit;
@@ -28,7 +31,8 @@ public class WebhookFormatterTests
         var c = new PluginConfiguration { WebhookUrl = "https://ntfy.example/topic", WebhookFormat = "ntfy" };
         var req = WebhookFormatter.Build(c, Blocked)!;
         Assert.Equal(HttpMethod.Post, req.Method);
-        Assert.Equal("JellyLinks : lot bloqué", req.Headers.GetValues("Title").Single());
+        Assert.All(req.Headers.SelectMany(h => h.Value), v => Assert.True(Ascii.IsValid(v), v));
+        Assert.Equal("JellyLinks : lot bloqué", DecodeRfc2047(req.Headers.GetValues("Title").Single()));
         Assert.Contains("warning", req.Headers.GetValues("Tags").Single());
         var body = await req.Content!.ReadAsStringAsync();
         Assert.Contains("julien", body);
@@ -42,5 +46,58 @@ public class WebhookFormatterTests
         var body = await WebhookFormatter.Build(c, Blocked)!.Content!.ReadAsStringAsync();
         Assert.Contains("\"kind\":\"BatchBlocked\"", body);
         Assert.Contains("\"batchId\":7", body);
+    }
+
+    [Fact]
+    public async Task Ntfy_request_goes_through_a_real_http_client()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var server = Task.Run(async () =>
+        {
+            using var socket = await listener.AcceptTcpClientAsync();
+            var stream = socket.GetStream();
+            var buffer = new byte[8192];
+            var head = new StringBuilder();
+            while (!head.ToString().Contains("\r\n\r\n", StringComparison.Ordinal))
+            {
+                var n = await stream.ReadAsync(buffer);
+                if (n == 0)
+                {
+                    break;
+                }
+
+                head.Append(Encoding.ASCII.GetString(buffer, 0, n));
+            }
+
+            await stream.WriteAsync("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"u8.ToArray());
+            return head.ToString();
+        });
+
+        try
+        {
+            var c = new PluginConfiguration { WebhookUrl = $"http://127.0.0.1:{port}/topic", WebhookFormat = "ntfy" };
+            using var req = WebhookFormatter.Build(c, Blocked)!;
+            using var client = new HttpClient();
+            using var res = await client.SendAsync(req);
+            Assert.True(res.IsSuccessStatusCode);
+            Assert.Contains("Title: =?UTF-8?B?", await server, StringComparison.Ordinal);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    private static string DecodeRfc2047(string value)
+    {
+        const string prefix = "=?UTF-8?B?";
+        if (!value.StartsWith(prefix, StringComparison.Ordinal) || !value.EndsWith("?=", StringComparison.Ordinal))
+        {
+            return value;
+        }
+
+        return Encoding.UTF8.GetString(Convert.FromBase64String(value[prefix.Length..^2]));
     }
 }
