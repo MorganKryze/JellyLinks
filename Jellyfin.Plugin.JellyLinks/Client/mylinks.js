@@ -52,7 +52,7 @@
       var q = JL.quotaLine(data.quota);
       if (q) { nodes.push(el('div', { className: 'jlMuted', text: q.text }), bar(q.pct)); }
       if (!data.batches.length) {
-        nodes.push(el('div', { className: 'jlMsg jlMuted', text: 'Aucun lot pour l’instant : utilise le bouton « Liens » sur un film ou une série.' }));
+        nodes.push(el('div', { className: 'jlMsg jlMuted', text: 'Aucun lot pour l’instant : utilise l’icône lien (« Liens de téléchargement ») sur un film ou une série.' }));
       }
       data.batches.forEach(function (b) { nodes.push(card(b)); });
       d.content.replaceChildren.apply(d.content, nodes);
