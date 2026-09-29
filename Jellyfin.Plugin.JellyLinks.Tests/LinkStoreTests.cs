@@ -79,4 +79,32 @@ public class LinkStoreTests
 
         Assert.Equal(1, t.Store.CountActiveBatches(User, 100));
     }
+
+    [Fact]
+    public void Latest_session_for_link_prefers_a_complete_one()
+    {
+        using var t = new TempStore();
+        var id = t.Store.CreateBatch(User, 100, 200, "x", TempStore.AnySelection(Item),
+            new[] { TempStore.Video(Item, "a.mkv", 10) });
+        var link = t.Store.GetLinks(id)[0];
+        t.Store.InsertSession(new SessionRecord(0, link.Id, "1.1.1.1", "jd", 100, 100, 10, "0-9", SessionStatuses.Complete, true));
+        t.Store.InsertSession(new SessionRecord(0, link.Id, "2.2.2.2", "jd", 200, 200, 1, "0-0", SessionStatuses.InProgress, true));
+
+        Assert.Equal(SessionStatuses.Complete, t.Store.GetLatestSessionForLink(link.Id)!.Status);
+    }
+
+    [Fact]
+    public void All_links_complete_needs_a_complete_session_per_link()
+    {
+        using var t = new TempStore();
+        var id = t.Store.CreateBatch(User, 100, 200, "x", TempStore.AnySelection(Item),
+            new[] { TempStore.Video(Item, "a.mkv", 10), TempStore.Video(Guid.NewGuid(), "b.mkv", 10) });
+        var links = t.Store.GetLinks(id);
+
+        t.Store.InsertSession(new SessionRecord(0, links[0].Id, "1.1.1.1", "jd", 100, 100, 10, "0-9", SessionStatuses.Complete, true));
+        Assert.False(t.Store.AllLinksComplete(id));
+
+        t.Store.InsertSession(new SessionRecord(0, links[1].Id, "1.1.1.1", "jd", 100, 100, 10, "0-9", SessionStatuses.Complete, false));
+        Assert.True(t.Store.AllLinksComplete(id));
+    }
 }

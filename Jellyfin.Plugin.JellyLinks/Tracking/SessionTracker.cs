@@ -7,6 +7,8 @@ public sealed class SessionTracker
 {
     public const long IdleSeconds = 1800;
 
+    // ponytail: one lock for all sessions; per-session locks if flush contention ever shows up
+    private readonly object _gate = new();
     private readonly LinkStore _store;
     private readonly TimeProvider _clock;
 
@@ -20,15 +22,18 @@ public sealed class SessionTracker
 
     public SessionRecord Begin(LinkRecord link, string ip, string userAgent, bool isNewIpForBatch)
     {
-        var now = Now;
-        var last = _store.GetLatestSession(link.Id, ip);
-        if (last is not null && now - last.LastAt < IdleSeconds)
+        lock (_gate)
         {
-            return last;
-        }
+            var now = Now;
+            var last = _store.GetLatestSession(link.Id, ip);
+            if (last is not null && now - last.LastAt < IdleSeconds)
+            {
+                return last;
+            }
 
-        var fresh = new SessionRecord(0, link.Id, ip, userAgent, now, now, 0, string.Empty, SessionStatuses.InProgress, isNewIpForBatch);
-        return fresh with { Id = _store.InsertSession(fresh) };
+            var fresh = new SessionRecord(0, link.Id, ip, userAgent, now, now, 0, string.Empty, SessionStatuses.InProgress, isNewIpForBatch);
+            return fresh with { Id = _store.InsertSession(fresh) };
+        }
     }
 
     public bool Record(ref SessionRecord session, LinkRecord link, Guid userId, long start, long bytes)
@@ -38,21 +43,25 @@ public sealed class SessionTracker
             return false;
         }
 
-        var now = Now;
-        var ranges = ByteRanges.Add(ByteRanges.Parse(session.Ranges), start, start + bytes - 1);
-        var wasComplete = session.Status == SessionStatuses.Complete;
-        var isComplete = wasComplete || ByteRanges.Covers(ranges, link.Size);
-
-        session = session with
+        lock (_gate)
         {
-            LastAt = now,
-            BytesSent = session.BytesSent + bytes,
-            Ranges = ByteRanges.Serialize(ranges),
-            Status = isComplete ? SessionStatuses.Complete : SessionStatuses.InProgress,
-        };
-        _store.UpdateSession(session);
-        _store.AddUsage(userId, now / 86_400, bytes);
+            var now = Now;
+            var stored = _store.GetSession(session.Id) ?? session;
+            var ranges = ByteRanges.Add(ByteRanges.Parse(stored.Ranges), start, start + bytes - 1);
+            var wasComplete = stored.Status == SessionStatuses.Complete;
+            var isComplete = wasComplete || ByteRanges.Covers(ranges, link.Size);
 
-        return isComplete && !wasComplete;
+            session = stored with
+            {
+                LastAt = now,
+                BytesSent = stored.BytesSent + bytes,
+                Ranges = ByteRanges.Serialize(ranges),
+                Status = isComplete ? SessionStatuses.Complete : SessionStatuses.InProgress,
+            };
+            _store.UpdateSession(session);
+            _store.AddUsage(userId, now / 86_400, bytes);
+
+            return isComplete && !wasComplete;
+        }
     }
 }

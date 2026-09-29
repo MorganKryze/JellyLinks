@@ -76,4 +76,22 @@ public class SessionTrackerTests
         var today = clock.GetUtcNow().ToUnixTimeSeconds() / 86_400;
         Assert.Equal(999, t.Store.GetUsageSince(User, today));
     }
+
+    [Fact]
+    public void Stale_copies_from_parallel_requests_still_complete_once()
+    {
+        var (t, _, tracker, link) = Setup();
+        using var __ = t;
+        var a = tracker.Begin(link, "1.1.1.1", "jd", true);
+        var b = tracker.Begin(link, "1.1.1.1", "jd", true);
+        Assert.Equal(a.Id, b.Id);
+
+        Assert.False(tracker.Record(ref a, link, User, 0, 500));
+        Assert.True(tracker.Record(ref b, link, User, 500, 500));
+
+        var stored = t.Store.GetSession(a.Id)!;
+        Assert.Equal(SessionStatuses.Complete, stored.Status);
+        Assert.Equal(1000, stored.BytesSent);
+        Assert.False(tracker.Record(ref a, link, User, 0, 10));
+    }
 }

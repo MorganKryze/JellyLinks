@@ -132,6 +132,9 @@ public sealed class LinkStore
     public IReadOnlyList<LinkRecord> GetLinks(long batchId) =>
         Query(LinkSql + " WHERE batch_id = $b ORDER BY id", ReadLink, ("$b", batchId));
 
+    public SessionRecord? GetSession(long id) =>
+        Query(SessionSql + " WHERE id = $id", ReadSession, ("$id", id)).FirstOrDefault();
+
     public SessionRecord? GetLatestSession(long linkId, string ip) =>
         Query(SessionSql + " WHERE link_id = $l AND ip = $ip ORDER BY last_at DESC, id DESC LIMIT 1", ReadSession,
             ("$l", linkId), ("$ip", ip)).FirstOrDefault();
