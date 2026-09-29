@@ -158,6 +158,11 @@
     tpl.parentNode.insertBefore(a, tpl.nextSibling);
   }
 
+  // The script outlives a logout: entries added for one user must not stay for the next.
+  function removeEntries() {
+    Array.prototype.forEach.call(document.querySelectorAll('.jlNavLink, .jlSettingsRow'), function (n) { n.remove(); });
+  }
+
   function decorateNav() {
     if (!JL.openMyLinks) { return; }
     var settings = document.querySelector('.mainDrawer .userMenuOptions .btnSettings');
@@ -178,7 +183,7 @@
     var id = e.detail && e.detail.params && e.detail.params.id;
     if (!view) { return; }
     if (view.id === 'itemDetailPage') { decorateDetail(view, id); }
-    if (view.id === 'myPreferencesMenuPage') { canDownload().then(function (ok) { if (ok) { decorateSettings(view); } }); }
+    if (view.id === 'myPreferencesMenuPage') { canDownload().then(function (ok) { if (ok) { decorateSettings(view); } else { removeEntries(); } }); }
   });
 
   var queued = false;
@@ -188,7 +193,7 @@
     requestAnimationFrame(function () {
       queued = false;
       Array.prototype.forEach.call(document.querySelectorAll('.actionSheet:not([data-jl])'), decorateSheet);
-      canDownload().then(function (ok) { if (ok) { decorateNav(); } });
+      canDownload().then(function (ok) { if (ok) { decorateNav(); } else { removeEntries(); } });
     });
   }).observe(document.body, { childList: true, subtree: true });
 
@@ -197,5 +202,5 @@
   var m0 = ID_IN_HASH.exec(location.hash);
   if (shown && m0) { decorateDetail(shown, m0[1]); }
   var prefs = document.querySelector('#myPreferencesMenuPage:not(.hide)');
-  if (prefs) { canDownload().then(function (ok) { if (ok) { decorateSettings(prefs); } }); }
+  if (prefs) { canDownload().then(function (ok) { if (ok) { decorateSettings(prefs); } else { removeEntries(); } }); }
 })(window.JellyLinks);
