@@ -1,6 +1,7 @@
 using Jellyfin.Plugin.JellyLinks.Configuration;
 using Jellyfin.Plugin.JellyLinks.Data;
 using Jellyfin.Plugin.JellyLinks.Library;
+using Jellyfin.Plugin.JellyLinks.Maintenance;
 using Jellyfin.Plugin.JellyLinks.Notify;
 using Jellyfin.Plugin.JellyLinks.Policy;
 using Jellyfin.Plugin.JellyLinks.Signing;
@@ -28,6 +29,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         services.AddSingleton<IActivitySink, JellyfinActivitySink>();
         services.AddSingleton<Notifier>();
         services.AddSingleton<QuotaService>();
+        services.AddSingleton<MaintenanceRunner>();
         services.AddSingleton<SessionTracker>();
         services.AddTransient<FileGate>();
     }
