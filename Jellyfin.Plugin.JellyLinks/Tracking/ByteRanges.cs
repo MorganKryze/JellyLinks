@@ -32,6 +32,9 @@ public static class ByteRanges
     public static string Serialize(IReadOnlyList<(long Start, long End)> ranges) =>
         string.Join(',', ranges.Select(r => string.Create(CultureInfo.InvariantCulture, $"{r.Start}-{r.End}")));
 
+    public static long CoveredBytes(string ranges) =>
+        Parse(ranges).Sum(r => r.End - r.Start + 1);
+
     public static IReadOnlyList<(long Start, long End)> Parse(string text)
     {
         if (string.IsNullOrEmpty(text))

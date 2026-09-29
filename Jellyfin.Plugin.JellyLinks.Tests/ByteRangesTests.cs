@@ -54,4 +54,11 @@ public class ByteRangesTests
         Assert.Equal(r, ByteRanges.Parse("0-99,200-399"));
         Assert.Empty(ByteRanges.Parse(string.Empty));
     }
+
+    [Fact]
+    public void CoveredBytes_sums_the_inclusive_ranges()
+    {
+        Assert.Equal(200, ByteRanges.CoveredBytes("0-99,200-299"));
+        Assert.Equal(0, ByteRanges.CoveredBytes(string.Empty));
+    }
 }

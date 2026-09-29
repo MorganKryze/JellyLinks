@@ -6,6 +6,7 @@ using Jellyfin.Plugin.JellyLinks.Library;
 using Jellyfin.Plugin.JellyLinks.Policy;
 using Jellyfin.Plugin.JellyLinks.Serving;
 using Jellyfin.Plugin.JellyLinks.Signing;
+using Jellyfin.Plugin.JellyLinks.Tracking;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -181,7 +182,7 @@ public sealed class BatchesController : ControllerBase
             }
 
             var url = state == BatchStates.Active ? LinkUrlBuilder.Build(baseUrl, Signer.Sign(l.Id, b.ExpiresAt), l.FileName) : string.Empty;
-            views.Add(new LinkView(l.FileName, l.Size, l.Kind, url, s?.Status ?? "pending", s?.BytesSent ?? 0));
+            views.Add(new LinkView(l.FileName, l.Size, l.Kind, url, s?.Status ?? "pending", s is null ? 0 : ByteRanges.CoveredBytes(s.Ranges)));
         }
 
         return new BatchResponse(b.Id, b.Label, b.CreatedAt, b.ExpiresAt, state, links.Count, links.Sum(l => l.Size), complete, views);
