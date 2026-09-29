@@ -9,7 +9,7 @@
 
   JL.openMyLinks = function () {
     var d = JL.openDialog('Mes liens');
-    var data = null, notice = '', open = {};
+    var data = null, notice = '', open = {}, busy = false;
 
     function load() {
       d.content.replaceChildren(el('div', { className: 'jlMsg jlMuted', text: 'Chargement…' }));
@@ -70,10 +70,13 @@
         return;
       }
       if (a === 'revoke' && !window.confirm('Révoquer « ' + JL.labelTitle(b.Label) + ' » ? Ses liens cesseront de fonctionner.')) { return; }
+      if (busy) { return; }
+      busy = true;
       JL.api('POST', 'batches/' + b.Id + '/' + a).then(function () {
+        busy = false;
         notice = a === 'revoke' ? 'Lot révoqué.' : 'Nouveau lot créé : ses liens sont prêts à être copiés.';
         load();
-      }, function (status) { notice = JL.errorMessage(status); render(); });
+      }, function (status) { busy = false; notice = JL.errorMessage(status); render(); });
     }
 
     load();
