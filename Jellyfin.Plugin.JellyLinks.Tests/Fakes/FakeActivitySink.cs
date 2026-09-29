@@ -8,7 +8,11 @@ public sealed class FakeActivitySink : IActivitySink
 
     public Task WriteAsync(LinkEvent e)
     {
-        Events.Add(e);
+        lock (Events)
+        {
+            Events.Add(e);
+        }
+
         return Task.CompletedTask;
     }
 }

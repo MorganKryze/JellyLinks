@@ -66,6 +66,11 @@ public sealed class LinkStore
               status TEXT NOT NULL,
               new_ip INTEGER NOT NULL);
             CREATE INDEX ix_sessions_link_ip ON sessions(link_id, ip, last_at);
+            CREATE TABLE batch_ips (
+              batch_id INTEGER NOT NULL REFERENCES batches(id),
+              ip TEXT NOT NULL,
+              first_at INTEGER NOT NULL,
+              PRIMARY KEY (batch_id, ip));
             CREATE TABLE usage (
               user_id TEXT NOT NULL,
               day INTEGER NOT NULL,
@@ -157,16 +162,32 @@ public sealed class LinkStore
         Exec("UPDATE sessions SET last_at = $la, bytes_sent = $b, ranges = $r, status = $s WHERE id = $id",
             ("$la", s.LastAt), ("$b", s.BytesSent), ("$r", s.Ranges), ("$s", s.Status), ("$id", s.Id));
 
-    public bool BatchHasIp(long batchId, string ip) =>
-        Convert.ToInt64(Scalar("""
-            SELECT EXISTS (SELECT 1 FROM sessions s JOIN links l ON l.id = s.link_id
-                           WHERE l.batch_id = $b AND s.ip = $ip);
-            """, ("$b", batchId), ("$ip", ip)), CultureInfo.InvariantCulture) == 1;
+    /// <summary>
+    /// Records an address for a batch, atomically: known → nothing; new and within the limit → recorded;
+    /// new past the limit (when limit &gt; 0) → nothing recorded, OverLimit. Distinct counts this address.
+    /// </summary>
+    public IpAdmission AdmitIp(long batchId, string ip, int limit, long now)
+    {
+        using var c = Open();
+        using var tx = c.BeginTransaction(deferred: false); // BEGIN IMMEDIATE: one writer decides at a time
+        var known = Convert.ToInt64(Scalar(c, "SELECT EXISTS (SELECT 1 FROM batch_ips WHERE batch_id = $b AND ip = $ip);", tx,
+            ("$b", batchId), ("$ip", ip)), CultureInfo.InvariantCulture) == 1;
+        var count = Convert.ToInt32(Scalar(c, "SELECT COUNT(*) FROM batch_ips WHERE batch_id = $b;", tx, ("$b", batchId)),
+            CultureInfo.InvariantCulture);
+        if (known)
+        {
+            return new IpAdmission(false, count, false);
+        }
 
-    public int CountDistinctIps(long batchId) =>
-        Convert.ToInt32(Scalar("""
-            SELECT COUNT(DISTINCT s.ip) FROM sessions s JOIN links l ON l.id = s.link_id WHERE l.batch_id = $b;
-            """, ("$b", batchId)), CultureInfo.InvariantCulture);
+        if (limit > 0 && count + 1 > limit)
+        {
+            return new IpAdmission(false, count + 1, true);
+        }
+
+        Exec(c, "INSERT INTO batch_ips (batch_id, ip, first_at) VALUES ($b, $ip, $t);", tx, ("$b", batchId), ("$ip", ip), ("$t", now));
+        tx.Commit();
+        return new IpAdmission(true, count + 1, false);
+    }
 
     public bool AllLinksComplete(long batchId) =>
         Convert.ToInt64(Scalar("""
@@ -222,7 +243,7 @@ public sealed class LinkStore
                               WHERE b.expires_at <= $n OR b.state = 'revoked');
             """, ("$n", now));
 
-    /// <summary>Folds sessions older than the cut-off into IP-free monthly totals, then deletes them.</summary>
+    /// <summary>Folds sessions older than the cut-off into IP-free monthly totals, then deletes them and old batch addresses.</summary>
     public int AggregateAndPurge(long before)
     {
         using var c = Open();
@@ -238,6 +259,7 @@ public sealed class LinkStore
               bytes = bytes + excluded.bytes, completed_count = completed_count + excluded.completed_count;
             """, tx, ("$t", before));
         var n = Exec(c, "DELETE FROM sessions WHERE last_at < $t", tx, ("$t", before));
+        Exec(c, "DELETE FROM batch_ips WHERE first_at < $t", tx, ("$t", before));
         tx.Commit();
         return n;
     }

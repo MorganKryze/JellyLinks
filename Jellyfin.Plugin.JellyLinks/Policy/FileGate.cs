@@ -81,22 +81,20 @@ public sealed class FileGate
             return new GateResult(GateOutcome.Serve, link, batch, path, false);
         }
 
-        // 6. addresses
-        var isNew = !_store.BatchHasIp(batch.Id, ip);
-        string? newIpDetail = null;
-        if (isNew)
+        // 6. addresses: recorded atomically, announced once per (batch, address)
+        var limit = batch.IpLimitOverride ?? _config().IpLimit;
+        var ipCheck = _store.AdmitIp(batch.Id, ip, limit, now);
+        if (ipCheck.OverLimit)
         {
-            var limit = batch.IpLimitOverride ?? _config().IpLimit;
-            var distinct = _store.CountDistinctIps(batch.Id) + 1;
-            if (limit > 0 && distinct > limit)
-            {
-                var detail = $"{distinct} adresses distinctes (limite {limit}), dernière : {ip}";
-                _store.SetBatchState(batch.Id, BatchStates.Blocked, detail);
-                await Publish(EventKind.BatchBlocked, batch, detail).ConfigureAwait(false);
-                return Deny(GateOutcome.Forbidden, link, batch);
-            }
+            var detail = $"{ipCheck.Distinct} adresses distinctes (limite {limit}), dernière : {ip}";
+            _store.SetBatchState(batch.Id, BatchStates.Blocked, detail);
+            await Publish(EventKind.BatchBlocked, batch, detail).ConfigureAwait(false);
+            return Deny(GateOutcome.Forbidden, link, batch);
+        }
 
-            newIpDetail = $"adresse {ip} ({distinct}/{(limit > 0 ? limit : "∞")})";
+        if (ipCheck.IsNew)
+        {
+            await Publish(EventKind.NewIp, batch, $"adresse {ip} ({ipCheck.Distinct}/{(limit > 0 ? limit : "∞")})").ConfigureAwait(false);
         }
 
         // 7. quota
@@ -107,12 +105,7 @@ public sealed class FileGate
             return Deny(GateOutcome.TooManyRequests, link, batch);
         }
 
-        if (newIpDetail is not null)
-        {
-            await Publish(EventKind.NewIp, batch, newIpDetail).ConfigureAwait(false);
-        }
-
-        return new GateResult(GateOutcome.Serve, link, batch, path, isNew);
+        return new GateResult(GateOutcome.Serve, link, batch, path, ipCheck.IsNew);
     }
 
     private static GateResult Deny(GateOutcome o, LinkRecord? l = null, BatchRecord? b = null) => new(o, l, b, null, false);

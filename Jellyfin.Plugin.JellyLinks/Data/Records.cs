@@ -37,3 +37,6 @@ public sealed record SessionRecord(
     long BytesSent, string Ranges, string Status, bool NewIp);
 
 public sealed record QuotaOverride(Guid UserId, long VolumeBytes, int PeriodDays, int MaxActiveBatches);
+
+/// <summary>Outcome of recording an address for a batch. Distinct includes this address.</summary>
+public readonly record struct IpAdmission(bool IsNew, int Distinct, bool OverLimit);

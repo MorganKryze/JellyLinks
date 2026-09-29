@@ -38,20 +38,18 @@ public class LinkStoreTests
     }
 
     [Fact]
-    public void Distinct_ips_are_counted_per_batch()
+    public void Addresses_are_admitted_once_per_batch_up_to_the_limit()
     {
         using var t = new TempStore();
         var id = t.Store.CreateBatch(User, 100, 200, "x", TempStore.AnySelection(Item),
-            new[] { TempStore.Video(Item, "a.mkv", 10), TempStore.Video(Guid.NewGuid(), "b.mkv", 10) });
-        var links = t.Store.GetLinks(id);
+            new[] { TempStore.Video(Item, "a.mkv", 10) });
 
-        t.Store.InsertSession(new SessionRecord(0, links[0].Id, "1.1.1.1", "jd", 100, 100, 0, "", SessionStatuses.InProgress, true));
-        t.Store.InsertSession(new SessionRecord(0, links[1].Id, "1.1.1.1", "jd", 100, 100, 0, "", SessionStatuses.InProgress, false));
-        t.Store.InsertSession(new SessionRecord(0, links[1].Id, "2.2.2.2", "jd", 100, 100, 0, "", SessionStatuses.InProgress, true));
-
-        Assert.Equal(2, t.Store.CountDistinctIps(id));
-        Assert.True(t.Store.BatchHasIp(id, "2.2.2.2"));
-        Assert.False(t.Store.BatchHasIp(id, "3.3.3.3"));
+        Assert.Equal(new IpAdmission(true, 1, false), t.Store.AdmitIp(id, "1.1.1.1", 2, 100));
+        Assert.Equal(new IpAdmission(false, 1, false), t.Store.AdmitIp(id, "1.1.1.1", 2, 101));
+        Assert.Equal(new IpAdmission(true, 2, false), t.Store.AdmitIp(id, "2.2.2.2", 2, 102));
+        Assert.Equal(new IpAdmission(false, 3, true), t.Store.AdmitIp(id, "3.3.3.3", 2, 103));
+        Assert.Equal(new IpAdmission(false, 2, false), t.Store.AdmitIp(id, "2.2.2.2", 2, 104));
+        Assert.Equal(new IpAdmission(true, 3, false), t.Store.AdmitIp(id, "3.3.3.3", 0, 105));
     }
 
     [Fact]

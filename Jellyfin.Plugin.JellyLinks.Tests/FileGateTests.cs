@@ -93,9 +93,7 @@ public sealed class FileGateTests : IDisposable
     {
         foreach (var ip in new[] { "1.1.1.1", "2.2.2.2", "3.3.3.3" })
         {
-            var ok = await _gate.CheckAsync(Token(), ip, false);
-            Assert.Equal(GateOutcome.Serve, ok.Outcome);
-            _t.Store.InsertSession(new SessionRecord(0, _link.Id, ip, "jd", 1, 1, 0, "", SessionStatuses.InProgress, ok.IsNewIp));
+            Assert.Equal(GateOutcome.Serve, (await _gate.CheckAsync(Token(), ip, false)).Outcome);
         }
 
         var fourth = await _gate.CheckAsync(Token(), "4.4.4.4", false);
@@ -113,7 +111,6 @@ public sealed class FileGateTests : IDisposable
         {
             var ip = $"10.0.0.{i}";
             Assert.Equal(GateOutcome.Serve, (await _gate.CheckAsync(Token(), ip, false)).Outcome);
-            _t.Store.InsertSession(new SessionRecord(0, _link.Id, ip, "jd", 1, 1, 0, "", SessionStatuses.InProgress, true));
         }
     }
 
@@ -128,13 +125,38 @@ public sealed class FileGateTests : IDisposable
     }
 
     [Fact]
-    public async Task Refused_new_address_on_exhausted_quota_emits_no_new_ip_event()
+    public async Task New_address_refused_by_quota_is_announced_once()
     {
         _cfg.QuotaEnabled = true;
         _cfg.QuotaVolumeBytes = 100;
         _t.Store.AddUsage(User, 1_800_000_000 / 86_400, 100);
         Assert.Equal(GateOutcome.TooManyRequests, (await _gate.CheckAsync(Token(), "5.5.5.5", false)).Outcome);
-        Assert.DoesNotContain(_sink.Events, e => e.Kind == EventKind.NewIp);
+        Assert.Equal(GateOutcome.TooManyRequests, (await _gate.CheckAsync(Token(), "5.5.5.5", false)).Outcome);
+        Assert.Single(_sink.Events, e => e.Kind == EventKind.NewIp);
+        Assert.Contains(_sink.Events, e => e.Kind == EventKind.QuotaReached);
+    }
+
+    [Fact]
+    public async Task Parallel_requests_from_one_new_address_announce_it_once()
+    {
+        var results = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => Task.Run(() => _gate.CheckAsync(Token(), "7.7.7.7", false))));
+        Assert.All(results, r => Assert.Equal(GateOutcome.Serve, r.Outcome));
+        Assert.Single(_sink.Events, e => e.Kind == EventKind.NewIp);
+        Assert.Single(results, r => r.IsNewIp);
+    }
+
+    [Fact]
+    public async Task Two_new_addresses_racing_for_the_last_slot_admit_only_one()
+    {
+        _cfg.IpLimit = 3;
+        Assert.Equal(GateOutcome.Serve, (await _gate.CheckAsync(Token(), "1.1.1.1", false)).Outcome);
+        Assert.Equal(GateOutcome.Serve, (await _gate.CheckAsync(Token(), "2.2.2.2", false)).Outcome);
+
+        var results = await Task.WhenAll(new[] { "3.3.3.3", "4.4.4.4" }.Select(ip => Task.Run(() => _gate.CheckAsync(Token(), ip, false))));
+
+        Assert.Single(results, r => r.Outcome == GateOutcome.Serve);
+        Assert.Single(results, r => r.Outcome == GateOutcome.Forbidden);
+        Assert.Equal(BatchStates.Blocked, _t.Store.GetBatch(_batch)!.State);
     }
 
     [Fact]

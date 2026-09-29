@@ -64,4 +64,25 @@ public class MaintenanceRunnerTests
         ipCheck.CommandText = "SELECT COUNT(*) FROM sessions WHERE ip IS NOT NULL";
         Assert.Equal(0L, (long)ipCheck.ExecuteScalar()!);
     }
+
+    [Fact]
+    public void Addresses_older_than_retention_are_forgotten()
+    {
+        using var t = new TempStore();
+        var now = 1_800_000_000L;
+        var clock = new FakeTimeProvider(DateTimeOffset.FromUnixTimeSeconds(now));
+        var item = Guid.NewGuid();
+        var batch = t.Store.CreateBatch(User, now - (120 * Day), now - (113 * Day), "x", TempStore.AnySelection(item),
+            new[] { TempStore.Video(item, "a.mkv", 1000) });
+        t.Store.AdmitIp(batch, "1.1.1.1", 0, now - (100 * Day));
+        t.Store.AdmitIp(batch, "2.2.2.2", 0, now - Day);
+
+        new MaintenanceRunner(t.Store, () => new PluginConfiguration(), clock).Run();
+
+        using var c = new SqliteConnection($"Data Source={t.DbPath}");
+        c.Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT group_concat(ip) FROM batch_ips";
+        Assert.Equal("2.2.2.2", cmd.ExecuteScalar());
+    }
 }
