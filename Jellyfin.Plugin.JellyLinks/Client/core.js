@@ -196,7 +196,7 @@
     '.jlLink{background:none;border:0;color:#00a4dc;cursor:pointer;padding:0;font:inherit}',
     '.jlCheck{background:none;border:0;color:#00a4dc;cursor:pointer;font-size:1.15em;padding:0 .4em 0 0;font-family:inherit}',
     '.jlTools{display:flex;gap:1em;padding:.5em 0}',
-    '.jlFooter{display:flex;gap:.5em;justify-content:flex-end}',
+    '.jlFooter{display:flex;gap:.5em;justify-content:flex-end;box-sizing:border-box}',
     '.jlBar{height:8px;background:rgba(128,128,128,.25);border-radius:4px;overflow:hidden;margin:.3em 0 .8em}',
     '.jlBar i{display:block;height:100%;background:#00a4dc}',
     '.jlBar.jlDim i{background:#777}',
@@ -220,7 +220,7 @@
     JL.injectStyle();
     var backdrop = JL.el('div', { className: 'dialogBackdrop dialogBackdropOpened' });
     var content = JL.el('div', { className: 'dialogContentInner dialog-content-centered padded-left padded-right jlBody' });
-    var footer = JL.el('div', { className: 'formDialogFooter jlFooter' });
+    var footer = JL.el('div', { className: 'formDialogFooter formDialogFooter-flex jlFooter' });
     var container;
     var onKey = function (e) { if (e.key === 'Escape') { close(); } };
     var close = function () { document.removeEventListener('keydown', onKey); backdrop.remove(); container.remove(); };

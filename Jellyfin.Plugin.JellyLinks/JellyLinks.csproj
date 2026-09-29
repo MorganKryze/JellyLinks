@@ -28,6 +28,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="JellyLinks.Tests" />
     <EmbeddedResource Include="Configuration\configPage.html" />
+    <EmbeddedResource Include="Client\*.js" />
   </ItemGroup>
 
 </Project>

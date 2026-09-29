@@ -3,5 +3,6 @@ obj/
 docker/*-config/
 docker/*-cache/
 docker/media/
+docker/shows/
 *.user
 .DS_Store
