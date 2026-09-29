@@ -1,0 +1,12 @@
+name: jellylinks-v12
+services:
+  jellyfin-v12:
+    image: jellyfin/jellyfin:12.0
+    container_name: jellylinks-v12
+    volumes:
+      - ./v12-config:/config
+      - ./v12-cache:/cache
+      - ./media:/media:ro
+    ports:
+      - 8097:8096
+    restart: "no"

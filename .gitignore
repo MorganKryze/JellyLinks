@@ -1,0 +1,7 @@
+bin/
+obj/
+docker/*-config/
+docker/*-cache/
+docker/media/
+*.user
+.DS_Store
