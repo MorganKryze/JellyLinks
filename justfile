@@ -8,9 +8,10 @@ default:
 build:
 	dotnet build --configuration Release
 
-# Run tests
+# Run server and client tests
 test:
 	dotnet test
+	node --test tests/client/
 
 # Build, deploy to v10, and start
 v10: build
