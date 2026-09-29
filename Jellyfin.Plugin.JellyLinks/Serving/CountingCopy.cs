@@ -27,8 +27,9 @@ public static class CountingCopy
                 pending += read;
                 if (pending >= flushEvery)
                 {
-                    onFlush(pending);
-                    pending = 0;
+                    var flush = pending;
+                    pending = 0; // before the callback: if it throws, finally must not report these bytes again
+                    onFlush(flush);
                 }
             }
         }

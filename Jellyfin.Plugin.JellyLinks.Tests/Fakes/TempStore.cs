@@ -1,4 +1,5 @@
 using Jellyfin.Plugin.JellyLinks.Data;
+using Microsoft.Data.Sqlite;
 
 namespace JellyLinks.Tests.Fakes;
 
@@ -23,7 +24,13 @@ public sealed class TempStore : IDisposable
 
     public void Dispose()
     {
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        // Only this database's pools: ClearAllPools would dispose connections other tests are using right now.
+        foreach (var cs in new[] { new SqliteConnectionStringBuilder { DataSource = DbPath, Mode = SqliteOpenMode.ReadWriteCreate }.ToString(), $"Data Source={DbPath}" })
+        {
+            using var c = new SqliteConnection(cs);
+            SqliteConnection.ClearPool(c);
+        }
+
         foreach (var f in new[] { DbPath, DbPath + "-wal", DbPath + "-shm" })
         {
             File.Delete(f);

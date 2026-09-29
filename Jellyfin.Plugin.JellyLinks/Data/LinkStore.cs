@@ -16,7 +16,6 @@ public sealed class LinkStore
         {
             DataSource = dbPath,
             Mode = SqliteOpenMode.ReadWriteCreate,
-            Cache = SqliteCacheMode.Shared,
         }.ToString();
     }
 
@@ -128,8 +127,9 @@ public sealed class LinkStore
     public void SetIpLimitOverride(long id, int? limit) =>
         Exec("UPDATE batches SET ip_limit_override = $l WHERE id = $id", ("$l", (object?)limit ?? DBNull.Value), ("$id", id));
 
-    public void MarkCompletedNotified(long id) =>
-        Exec("UPDATE batches SET completed_notified = 1 WHERE id = $id", ("$id", id));
+    /// <summary>Compare-and-set: true for the one caller that flips the flag.</summary>
+    public bool MarkCompletedNotified(long id) =>
+        Exec("UPDATE batches SET completed_notified = 1 WHERE id = $id AND completed_notified = 0", ("$id", id)) == 1;
 
     public LinkRecord? GetLink(long id) =>
         Query(LinkSql + " WHERE id = $id", ReadLink, ("$id", id)).FirstOrDefault();

@@ -53,6 +53,18 @@ public class LinkStoreTests
     }
 
     [Fact]
+    public void Completion_is_claimed_only_once()
+    {
+        using var t = new TempStore();
+        var id = t.Store.CreateBatch(User, 100, 200, "x", TempStore.AnySelection(Item),
+            new[] { TempStore.Video(Item, "a.mkv", 10) });
+
+        Assert.True(t.Store.MarkCompletedNotified(id));
+        Assert.False(t.Store.MarkCompletedNotified(id));
+        Assert.True(t.Store.GetBatch(id)!.CompletedNotified);
+    }
+
+    [Fact]
     public void Usage_sums_from_a_day()
     {
         using var t = new TempStore();

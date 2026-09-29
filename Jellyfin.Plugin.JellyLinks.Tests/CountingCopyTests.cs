@@ -46,4 +46,25 @@ public class CountingCopyTests
         Assert.True(written <= 200_000);
         Assert.Equal(written, flushes.Sum());
     }
+
+    [Fact]
+    public async Task A_failing_flush_is_not_counted_twice()
+    {
+        var src = new MemoryStream(new byte[1_000_000]);
+        var dst = new MemoryStream();
+        var flushes = new List<long>();
+        var failed = false;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => CountingCopy.CopyAsync(src, dst, 1_000_000, 100_000, n =>
+        {
+            flushes.Add(n);
+            if (!failed)
+            {
+                failed = true;
+                throw new InvalidOperationException("tracker failed");
+            }
+        }, CancellationToken.None));
+
+        Assert.True(flushes.Sum() <= dst.Length, $"flushed {flushes.Sum()} for {dst.Length} written");
+    }
 }

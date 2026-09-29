@@ -11,8 +11,8 @@ public class LinkUrlBuilderTests
     [InlineData("Amélie 100%.mkv", "Am%C3%A9lie%20100%25.mkv")]
     public void Names_are_escaped_into_one_path_segment(string name, string escaped)
     {
-        Assert.Equal($"https://cinoche.example/JellyLinks/f/TOKEN/{escaped}",
-            LinkUrlBuilder.Build("https://cinoche.example/", "TOKEN", name));
+        Assert.Equal($"https://jellyfin.example/JellyLinks/f/TOKEN/{escaped}",
+            LinkUrlBuilder.Build("https://jellyfin.example/", "TOKEN", name));
     }
 
     [Fact]

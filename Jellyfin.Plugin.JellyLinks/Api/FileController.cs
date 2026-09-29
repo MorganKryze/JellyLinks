@@ -116,9 +116,8 @@ public sealed class FileController : ControllerBase
             cursor += chunk;
         }, HttpContext.RequestAborted).ConfigureAwait(false);
 
-        if (completed && !batch.CompletedNotified && _store.AllLinksComplete(batch.Id))
+        if (completed && !batch.CompletedNotified && _store.AllLinksComplete(batch.Id) && _store.MarkCompletedNotified(batch.Id))
         {
-            _store.MarkCompletedNotified(batch.Id);
             await _notifier.PublishAsync(new LinkEvent(EventKind.BatchCompleted, batch.UserId, _library.UserName(batch.UserId),
                 batch.Label, batch.Id, $"{_store.GetLinks(batch.Id).Count} fichiers reçus en entier")).ConfigureAwait(false);
         }
