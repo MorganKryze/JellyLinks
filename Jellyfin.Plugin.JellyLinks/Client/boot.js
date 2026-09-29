@@ -112,7 +112,20 @@
         if (ids2.length) { JL.openGenerate(ids2); }
       });
       scroller.appendChild(b);
+      keepInView(sheet);
     });
+  }
+
+  // Jellyfin places a sheet from its size before our entry exists: pull it back inside the window (its own 20 px margin).
+  function keepInView(sheet) {
+    var margin = 20;
+    var left = parseFloat(sheet.style.left), top = parseFloat(sheet.style.top);
+    if (!isNaN(left) && left + sheet.offsetWidth > window.innerWidth - margin) {
+      sheet.style.left = Math.max(0, window.innerWidth - sheet.offsetWidth - margin) + 'px';
+    }
+    if (!isNaN(top) && top + sheet.offsetHeight > window.innerHeight - margin) {
+      sheet.style.top = Math.max(0, window.innerHeight - sheet.offsetHeight - margin) + 'px';
+    }
   }
 
   // ---- "Mes liens" entries (drawer, modern user menu, settings page) ---------
