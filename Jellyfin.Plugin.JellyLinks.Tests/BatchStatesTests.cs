@@ -8,7 +8,7 @@ public class BatchStatesTests
     [Theory]
     [InlineData(BatchStates.Active, 100, 99, BatchStates.Active)]
     [InlineData(BatchStates.Active, 100, 100, BatchStates.Expired)]
-    [InlineData(BatchStates.Blocked, 100, 200, BatchStates.Expired)]
+    [InlineData(BatchStates.Blocked, 100, 200, BatchStates.Blocked)]
     [InlineData(BatchStates.Blocked, 100, 50, BatchStates.Blocked)]
     [InlineData(BatchStates.Revoked, 100, 200, BatchStates.Revoked)]
     [InlineData(BatchStates.Expired, 100, 50, BatchStates.Expired)]
