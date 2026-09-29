@@ -224,8 +224,16 @@
     var content = JL.el('div', { className: 'dialogContentInner dialog-content-centered padded-left padded-right jlBody' });
     var footer = JL.el('div', { className: 'formDialogFooter formDialogFooter-flex jlFooter' });
     var container;
-    var onKey = function (e) { if (e.key === 'Escape') { close(); } };
-    var close = function () { document.removeEventListener('keydown', onKey); backdrop.remove(); container.remove(); };
+    // Escape is ours: stop it so Jellyfin does not also treat it as "back". Browser back or a route change closes the dialog too.
+    var onKey = function (e) { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    var onNav = function () { close(); };
+    var close = function () {
+      document.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('popstate', onNav);
+      window.removeEventListener('hashchange', onNav);
+      backdrop.remove();
+      container.remove();
+    };
     var dialog = JL.el('div', { className: 'focuscontainer dialog formDialog opened centeredDialog jlDialog', attrs: { role: 'dialog', 'aria-modal': 'true' } }, [
       JL.el('div', { className: 'formDialogHeader' }, [
         JL.el('button', { type: 'button', className: 'btnCancel autoSize paper-icon-button-light', title: 'Fermer', on: { click: close } }, [JL.icon('close')]),
@@ -235,7 +243,9 @@
       footer
     ]);
     container = JL.el('div', { className: 'dialogContainer', on: { click: function (e) { if (e.target === container) { close(); } } } }, [dialog]);
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey, true);
+    window.addEventListener('popstate', onNav);
+    window.addEventListener('hashchange', onNav);
     document.body.appendChild(backdrop);
     document.body.appendChild(container);
     return { content: content, footer: footer, close: close };
