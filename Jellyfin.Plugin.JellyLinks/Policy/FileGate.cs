@@ -86,9 +86,9 @@ public sealed class FileGate
         var ipCheck = _store.AdmitIp(batch.Id, ip, limit, now);
         if (ipCheck.OverLimit)
         {
-            var detail = $"{ipCheck.Distinct} adresses distinctes (limite {limit}), dernière : {ip}";
-            _store.SetBatchState(batch.Id, BatchStates.Blocked, detail);
-            await Publish(EventKind.BatchBlocked, batch, detail).ConfigureAwait(false);
+            var reason = $"{ipCheck.Distinct} adresses distinctes (limite {limit})";
+            _store.SetBatchState(batch.Id, BatchStates.Blocked, reason); // stored: no address, it would outlive retention
+            await Publish(EventKind.BatchBlocked, batch, $"{reason}, dernière : {ip}").ConfigureAwait(false);
             return Deny(GateOutcome.Forbidden, link, batch);
         }
 

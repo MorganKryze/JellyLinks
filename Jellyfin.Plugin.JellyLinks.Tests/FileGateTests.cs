@@ -106,8 +106,10 @@ public sealed class FileGateTests : IDisposable
 
         var fourth = await _gate.CheckAsync(Token(), "4.4.4.4", false);
         Assert.Equal(GateOutcome.Forbidden, fourth.Outcome);
-        Assert.Equal(BatchStates.Blocked, _t.Store.GetBatch(_batch)!.State);
-        Assert.Contains(_sink.Events, e => e.Kind == EventKind.BatchBlocked);
+        var blocked = _t.Store.GetBatch(_batch)!;
+        Assert.Equal(BatchStates.Blocked, blocked.State);
+        Assert.Equal("4 adresses distinctes (limite 3)", blocked.BlockedReason); // no address kept in the database
+        Assert.Contains(_sink.Events, e => e.Kind == EventKind.BatchBlocked && e.Detail.Contains("4.4.4.4", StringComparison.Ordinal));
         Assert.Equal(3, _sink.Events.Count(e => e.Kind == EventKind.NewIp));
     }
 
