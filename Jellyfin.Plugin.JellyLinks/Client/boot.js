@@ -32,6 +32,9 @@
     var box = view.querySelector('.mainDetailButtons');
     if (!box || !id) { return; }
     view.setAttribute('data-jl-item', id);
+    // A cached view reused for another item: drop the previous item's button before the checks resolve.
+    var old = box.querySelector('.jlDetailBtn');
+    if (old && old.getAttribute('data-item-id') !== id) { old.remove(); }
     Promise.all([canDownload(), isLinkable(id)]).then(function (r) {
       if (view.getAttribute('data-jl-item') !== id) { return; } // navigated elsewhere meanwhile
       var b = box.querySelector('.jlDetailBtn');
@@ -48,17 +51,33 @@
   }
 
   // ---- "…" menus and the multi-selection menu --------------------------------
-  var menuItemId = null;
+  // The item a menu is about, recorded when it is opened: "…" click, right-click or long-press (contextmenu).
+  // The next item sheet consumes it; a record older than MENU_TTL belongs to some other menu.
+  var MENU_TTL = 3000;
+  var menuItem = null;
+  function remember(id) { menuItem = id ? { id: id, at: Date.now() } : null; }
+  function takeMenuItem() {
+    var m = menuItem;
+    menuItem = null;
+    return m && Date.now() - m.at <= MENU_TTL ? m.id : null;
+  }
+
   document.addEventListener('click', function (e) {
     var t = e.target && e.target.closest ? e.target.closest('button[data-action="menu"], .btnMoreCommands') : null;
     if (!t) { return; }
     if (t.classList.contains('btnMoreCommands')) {
       var m = ID_IN_HASH.exec(location.hash);
-      menuItemId = m && m[1];
+      remember(m && m[1]);
     } else {
       var card = t.closest('[data-id]');
-      menuItemId = card && card.getAttribute('data-id');
+      remember(card && card.getAttribute('data-id'));
     }
+  }, true);
+
+  document.addEventListener('contextmenu', function (e) {
+    var card = e.target && e.target.closest ? e.target.closest('[data-id]') : null;
+    if (card && card.closest('.actionSheet')) { card = null; }
+    remember(card && card.getAttribute('data-id'));
   }, true);
 
   function selectedIds() {
@@ -77,7 +96,7 @@
     var isItemMenu = ids.some(function (i) { return i === 'addtoplaylist' || i === 'playlist' || i === 'addtocollection'; });
     if (!isItemMenu) { return; } // sort, filter, playback… sheets
     var multi = !!document.querySelector('.selectionCommandsPanel') && ids.indexOf('selectall') >= 0;
-    var single = menuItemId;
+    var single = takeMenuItem();
     if (!multi && !single) { return; }
     canDownload().then(function (ok) {
       if (!ok || !sheet.isConnected) { return; }

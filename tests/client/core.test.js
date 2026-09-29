@@ -56,6 +56,11 @@ test('a movie with two versions is one group with one line per version', () => {
   assert.equal(JL.headline(g), 'Dune');
 });
 
+test('a movie with a single version is labelled by its title alone', () => {
+  const g = JL.buildTree([f({ ItemId: 'v1', Title: 'Sample Film', VersionName: 'Sample Film (2020)' })]);
+  assert.deepEqual(g[0].units.map(JL.unitLabel), ['Sample Film']);
+});
+
 test('season checkbox has three states', () => {
   const g = JL.buildTree(andor);
   const ex = new Set();

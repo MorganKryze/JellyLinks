@@ -15,22 +15,28 @@
   function totalText(t) { return JL.plural(t.files, 'fichier', 'fichiers') + ' · ' + JL.formatBytes(t.bytes); }
 
   JL.openGenerate = function (rootIds) {
-    var s = { allVersions: false, subs: true, expanded: false, excluded: new Set(), groups: [], preview: null, batch: null, open: {} };
+    var s = { allVersions: false, subs: true, expanded: false, excluded: new Set(), groups: [], preview: null, batch: null, pending: null, gen: 0, open: {} };
     var d = JL.openDialog('Liens de téléchargement');
 
     function message(text) { d.content.replaceChildren(el('div', { className: 'jlMsg', text: text })); }
 
+    // Every load() starts a new generation: answers (preview or batch) from an older one are ignored.
     function load() {
+      var gen = ++s.gen;
       s.batch = null;
+      s.pending = null;
       d.footer.replaceChildren();
       message('Chargement…');
       JL.api('POST', 'batches/preview', { RootItemIds: rootIds, AllVersions: s.allVersions, IncludeSubtitles: s.subs }).then(function (p) {
+        if (gen !== s.gen) { return; }
         s.preview = p;
         s.groups = JL.buildTree(p.Files);
         if (s.groups.length === 1) { s.open[s.groups[0].key] = true; }
         render();
-      }, function (status) { message(JL.errorMessage(status)); });
+      }, function (status) { if (gen === s.gen) { message(JL.errorMessage(status)); } });
     }
+
+    function busy(on) { Array.prototype.forEach.call(d.footer.querySelectorAll('button'), function (b) { b.disabled = on; }); }
 
     function versions() {
       var b = function (text, all) {
@@ -92,10 +98,10 @@
       rows.push(row("Valables jusqu'au", el('span', { text: JL.formatDate(p.ExpiresAt) + (remaining ? ' · ' + remaining : '') })));
       d.content.replaceChildren.apply(d.content, rows);
       d.footer.replaceChildren(
-        action('Télécharger .txt', false, t.units === 0, function () {
+        action('Télécharger .txt', false, t.units === 0 || !!s.pending, function () {
           withBatch(function (b) { JL.downloadText(JL.txtName(b.Label), JL.linksText(b)); done(b, 'Fichier .txt téléchargé.'); });
         }),
-        action('Copier les liens', true, t.units === 0, function () {
+        action('Copier les liens', true, t.units === 0 || !!s.pending, function () {
           withBatch(function (b) {
             JL.copyText(JL.linksText(b)).then(function (ok) {
               if (ok) { done(b, JL.plural(b.Links.length, 'lien copié', 'liens copiés') + ' dans le presse-papier.'); } else { manual(b); }
@@ -104,11 +110,23 @@
         }));
     }
 
-    // One click creates one batch; the other button then reuses it instead of creating a second one.
+    // One dialog creates at most one batch: a click while the POST is in flight chains on it,
+    // and the other button then reuses the batch instead of creating a second one.
     function withBatch(fn) {
       if (s.batch) { fn(s.batch); return; }
-      JL.api('POST', 'batches', { RootItemIds: rootIds, AllVersions: s.allVersions, IncludeSubtitles: s.subs, ExcludedItemIds: Array.from(s.excluded) })
-        .then(function (b) { s.batch = b; fn(b); }, function (status) { message(JL.errorMessage(status)); });
+      var gen = s.gen;
+      if (!s.pending) {
+        busy(true);
+        s.pending = JL.api('POST', 'batches', { RootItemIds: rootIds, AllVersions: s.allVersions, IncludeSubtitles: s.subs, ExcludedItemIds: Array.from(s.excluded) })
+          .then(function (b) {
+            if (gen === s.gen) { s.batch = b; s.pending = null; busy(false); }
+            return b;
+          }, function (status) {
+            if (gen === s.gen) { s.pending = null; busy(false); message(JL.errorMessage(status)); }
+            throw status;
+          });
+      }
+      s.pending.then(function (b) { if (gen === s.gen) { fn(b); } }, function () { /* already shown */ });
     }
 
     function done(b, text) {

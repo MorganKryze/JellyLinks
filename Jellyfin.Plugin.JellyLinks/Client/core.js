@@ -51,6 +51,8 @@
       }
       g.units.push(u);
     });
+    // A version name only tells lines apart: a movie with a single version shows its title alone.
+    groups.forEach(function (g) { if (g.units.length === 1) { g.units[0].version = null; } });
     return groups;
   };
 
