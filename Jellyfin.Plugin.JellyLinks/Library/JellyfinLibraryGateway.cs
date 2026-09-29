@@ -29,10 +29,9 @@ public sealed class JellyfinLibraryGateway : ILibraryGateway
     public bool CanDownload(Guid userId, Guid itemId)
     {
         var user = _users.GetUserById(userId);
-        var item = _library.GetItemById(itemId);
-        return user is not null && item is not null
+        return user is not null
             && user.HasPermission(PermissionKind.EnableContentDownloading)
-            && item.IsVisible(user);
+            && Visible(itemId, user) is not null;
     }
 
     public IReadOnlyList<ResolvedFile> Expand(Guid userId, IReadOnlyList<Guid> rootItemIds, bool allVersions, bool includeSubtitles)
@@ -62,7 +61,7 @@ public sealed class JellyfinLibraryGateway : ILibraryGateway
     public string? ResolvePath(Guid userId, Guid itemId, string mediaSourceId, int? streamIndex)
     {
         var user = _users.GetUserById(userId);
-        var item = _library.GetItemById(itemId);
+        var item = user is null ? null : Visible(itemId, user);
         if (user is null || item is null)
         {
             return null;
@@ -88,8 +87,8 @@ public sealed class JellyfinLibraryGateway : ILibraryGateway
 
     private IEnumerable<BaseItem> Videos(User user, Guid rootId)
     {
-        var root = _library.GetItemById(rootId);
-        if (root is null || !root.IsVisible(user))
+        var root = Visible(rootId, user);
+        if (root is null)
         {
             return Array.Empty<BaseItem>();
         }
@@ -106,8 +105,11 @@ public sealed class JellyfinLibraryGateway : ILibraryGateway
             Recursive = true,
             IsVirtualItem = false,
             OrderBy = new[] { (ItemSortBy.ParentIndexNumber, SortOrder.Ascending), (ItemSortBy.IndexNumber, SortOrder.Ascending) },
-        });
+        }).Where(v => v.IsVisibleStandalone(user)); // AncestorIds bypasses the library filter (box sets span libraries)
     }
+
+    /// <summary>The item when the user may see it: parental rating AND access to its library.</summary>
+    private BaseItem? Visible(Guid itemId, User user) => _library.GetItemById<BaseItem>(itemId, user);
 
     private IEnumerable<ResolvedFile> FilesOf(User user, BaseItem video, bool allVersions, bool includeSubtitles)
     {
