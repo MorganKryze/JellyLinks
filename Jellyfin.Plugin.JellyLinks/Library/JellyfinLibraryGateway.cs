@@ -34,6 +34,8 @@ public sealed class JellyfinLibraryGateway : ILibraryGateway
             && Visible(itemId, user) is not null;
     }
 
+    public bool ItemExists(Guid itemId) => _library.GetItemById(itemId) is not null;
+
     public IReadOnlyList<ResolvedFile> Expand(Guid userId, IReadOnlyList<Guid> rootItemIds, bool allVersions, bool includeSubtitles)
     {
         var user = _users.GetUserById(userId);

@@ -60,7 +60,21 @@ public sealed class FileController : ControllerBase
 
         var link = gate.Link!;
         var batch = gate.Batch!;
-        var size = new FileInfo(gate.Path!).Length;
+        FileStream? file;
+        long size;
+        try
+        {
+            file = isHead ? null : new FileStream(gate.Path!, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 81_920, FileOptions.Asynchronous | FileOptions.SequentialScan);
+            size = file?.Length ?? new FileInfo(gate.Path!).Length;
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            // removed between the gate and the open
+            Response.StatusCode = StatusCodes.Status410Gone;
+            return;
+        }
+
+        await using var owned = file;
         var range = RangeParser.Parse(Request.Headers.Range, size);
 
         Response.Headers.AcceptRanges = "bytes";
@@ -95,8 +109,7 @@ public sealed class FileController : ControllerBase
         var cursor = range.Start;
         var completed = false;
 
-        await using var file = new FileStream(gate.Path!, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 81_920, FileOptions.Asynchronous | FileOptions.SequentialScan);
-        file.Seek(range.Start, SeekOrigin.Begin);
+        file!.Seek(range.Start, SeekOrigin.Begin);
         await CountingCopy.CopyAsync(file, Response.Body, length, FlushEvery, chunk =>
         {
             completed |= _tracker.Record(ref session.Value, link, batch.UserId, cursor, chunk);

@@ -63,10 +63,10 @@ public sealed class FileGate
             return Deny(GateOutcome.Forbidden, link, batch);
         }
 
-        // 4. Jellyfin permission, re-checked on every request
+        // 4. Jellyfin permission, re-checked on every request (an item gone from the library is 410, not 403)
         if (!_library.CanDownload(batch.UserId, link.ItemId))
         {
-            return Deny(GateOutcome.Forbidden, link, batch);
+            return Deny(_library.ItemExists(link.ItemId) ? GateOutcome.Forbidden : GateOutcome.Gone, link, batch);
         }
 
         // 5. file still there (path resolved now, never stored)

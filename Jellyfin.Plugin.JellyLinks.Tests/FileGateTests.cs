@@ -82,6 +82,14 @@ public sealed class FileGateTests : IDisposable
     }
 
     [Fact]
+    public async Task Item_removed_from_the_library_is_410()
+    {
+        _lib.Allowed = false;
+        _lib.Exists = false;
+        Assert.Equal(GateOutcome.Gone, (await _gate.CheckAsync(Token(), "1.1.1.1", false)).Outcome);
+    }
+
+    [Fact]
     public async Task Deleted_file_is_410()
     {
         _lib.Path = null;

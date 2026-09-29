@@ -20,6 +20,9 @@ public interface ILibraryGateway
     /// <summary>False when the user is gone, lacks the download permission, or cannot see the item.</summary>
     bool CanDownload(Guid userId, Guid itemId);
 
+    /// <summary>True while the item is still in the library, whoever asks (tells 403 from 410).</summary>
+    bool ItemExists(Guid itemId);
+
     /// <summary>Movies/episodes under the roots, one entry per video version and per external subtitle.</summary>
     IReadOnlyList<ResolvedFile> Expand(Guid userId, IReadOnlyList<Guid> rootItemIds, bool allVersions, bool includeSubtitles);
 
