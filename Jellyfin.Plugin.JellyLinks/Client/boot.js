@@ -133,7 +133,11 @@
     var t = a.querySelector('.navMenuOptionText, .listItemBodyText, .MuiListItemText-primary, .MuiTypography-root');
     if (t) { t.textContent = text; } else { a.replaceChildren(text); }
     var ic = a.querySelector('.navMenuOptionIcon, .listItemIcon, .MuiListItemIcon-root');
-    if (ic) { ic.replaceWith(JL.icon(iconName, ic.classList.contains('navMenuOptionIcon') ? 'navMenuOptionIcon' : 'listItemIcon')); }
+    if (!ic) { return; }
+    // MUI menu: keep the icon box, swap its svg. Legacy rows: keep the style classes (listItemIcon-transparent), swap the glyph.
+    if (ic.classList.contains('MuiListItemIcon-root')) { ic.replaceChildren(JL.icon(iconName)); return; }
+    var keep = Array.prototype.filter.call(ic.classList, function (c) { return /^(navMenuOptionIcon|listItemIcon)/.test(c); });
+    ic.replaceWith(JL.icon(iconName, keep.join(' ')));
   }
 
   function openMyLinks(e) {
