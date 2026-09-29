@@ -5,7 +5,7 @@ namespace Jellyfin.Plugin.JellyLinks.Client;
 /// <summary>The web client script: the embedded Client/*.js files, in dependency order.</summary>
 public static class ClientScript
 {
-    public static readonly string[] Parts = { "core.js", "generate.js", "boot.js" };
+    public static readonly string[] Parts = { "core.js", "generate.js", "mylinks.js", "boot.js" };
 
     public static string Load()
     {
