@@ -83,8 +83,9 @@ public sealed partial class LinkStore
             r => new UserTotals(Guid.Parse(r.GetString(0)), r.GetInt64(1), r.GetInt32(2)));
 
     /// <summary>Revokes every active or blocked batch (the "Tout révoquer" button, together with a new signing secret).</summary>
-    public int RevokeAll(string reason) =>
-        Exec("UPDATE batches SET state = 'revoked', blocked_reason = $r WHERE state IN ('active', 'blocked')", ("$r", reason));
+    public int RevokeAll(string reason, long now) =>
+        Exec("UPDATE batches SET state = 'revoked', blocked_reason = $r WHERE (state = 'active' AND expires_at > $now) OR state = 'blocked'",
+            ("$r", reason), ("$now", now));
 
     private static BatchRow ReadBatchRow(SqliteDataReader r) => new(
         r.GetInt64(0), Guid.Parse(r.GetString(1)), r.GetString(2), r.GetInt64(3), r.GetInt64(4), r.GetString(5),

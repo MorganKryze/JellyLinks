@@ -118,7 +118,9 @@ public class AdminQueriesTests
         t.Store.SetBatchState(blocked, BatchStates.Blocked, "x");
 
         Assert.Equal(new[] { new UserTotals(Alice, 1000, 1) }, t.Store.ArchivedTotals());
-        Assert.Equal(2, t.Store.RevokeAll("tout révoqué"));
+        var lapsed = Batch(t, Bob, "L", Now - (10 * Day), Now - 1, 1);
+        Assert.Equal(2, t.Store.RevokeAll("tout révoqué", Now));
         Assert.Equal(BatchStates.Revoked, t.Store.GetBatch(blocked)!.State);
+        Assert.Equal(BatchStates.Active, t.Store.GetBatch(lapsed)!.State);
     }
 }

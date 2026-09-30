@@ -274,7 +274,7 @@ public sealed class AdminController : ControllerBase
         var plugin = Plugin.Instance!;
         plugin.Configuration.SigningSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         plugin.SaveConfiguration();
-        var n = _store.RevokeAll("tout révoqué par l'administrateur");
+        var n = _store.RevokeAll("tout révoqué par l'administrateur", Now);
         _ = _notifier.PublishAsync(new LinkEvent(EventKind.AllRevoked, Guid.Empty, "admin", string.Empty, 0, $"{n} lots révoqués, secret renouvelé"));
         return new RevokeAllResult(n);
     }
