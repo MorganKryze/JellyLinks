@@ -1,3 +1,4 @@
+using System.Globalization;
 using Jellyfin.Plugin.JellyLinks.Data;
 using Jellyfin.Plugin.JellyLinks.Notify;
 using Jellyfin.Plugin.JellyLinks.Policy;
@@ -75,7 +76,12 @@ public sealed class FileController : ControllerBase
         }
 
         await using var owned = file;
-        var range = RangeParser.Parse(Request.Headers.Range, size);
+        var lastWrite = System.IO.File.GetLastWriteTimeUtc(gate.Path!);
+        var etag = RangeParser.ETag(size, lastWrite);
+        Response.Headers.ETag = etag;
+        Response.Headers.LastModified = lastWrite.ToString("R", CultureInfo.InvariantCulture);
+        var wanted = RangeParser.IfRangeHolds(Request.Headers.IfRange, etag, lastWrite) ? Request.Headers.Range.ToString() : null;
+        var range = RangeParser.Parse(wanted, size);
 
         Response.Headers.AcceptRanges = "bytes";
         Response.ContentType = "application/octet-stream";

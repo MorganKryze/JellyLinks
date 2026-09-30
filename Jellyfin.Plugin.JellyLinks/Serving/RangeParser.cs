@@ -15,6 +15,37 @@ public readonly record struct RangeRequest(RangeKind Kind, long Start, long End)
 /// <summary>Single-range parser. Anything unreadable or multi-range is served whole (RFC 9110 §14.2).</summary>
 public static class RangeParser
 {
+    /// <summary>Strong validator of a served file: changes when the file is replaced (size or modification time).</summary>
+    public static string ETag(long size, DateTime lastWriteUtc) =>
+        string.Create(CultureInfo.InvariantCulture, $"\"{size:x}-{lastWriteUtc.Ticks:x}\"");
+
+    /// <summary>
+    /// RFC 9110 §13.1.5: a Range is honoured only while If-Range (when sent) still names this exact file; otherwise
+    /// the whole file must be sent, so a resumed download never mixes two versions.
+    /// </summary>
+    public static bool IfRangeHolds(string? ifRange, string etag, DateTime lastWriteUtc)
+    {
+        if (string.IsNullOrWhiteSpace(ifRange))
+        {
+            return true;
+        }
+
+        var value = ifRange.Trim();
+        if (value.StartsWith('"'))
+        {
+            return string.Equals(value, etag, StringComparison.Ordinal);
+        }
+
+        if (value.StartsWith("W/", StringComparison.Ordinal))
+        {
+            return false; // a weak validator never satisfies If-Range
+        }
+
+        var seconds = new DateTime(lastWriteUtc.Ticks - (lastWriteUtc.Ticks % TimeSpan.TicksPerSecond), DateTimeKind.Utc);
+        return DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date)
+            && date.UtcDateTime == seconds;
+    }
+
     public static RangeRequest Parse(string? header, long size)
     {
         var full = new RangeRequest(RangeKind.Full, 0, size - 1);

@@ -36,4 +36,31 @@ public class RangeParserTests
     {
         Assert.Equal(new RangeRequest(RangeKind.Full, 0, 999), RangeParser.Parse(header, 1000));
     }
+
+    private static readonly DateTime Written = new(2026, 9, 30, 12, 0, 0, 500, DateTimeKind.Utc);
+
+    [Fact]
+    public void Etag_changes_when_the_file_is_replaced()
+    {
+        var e = RangeParser.ETag(1000, Written);
+        Assert.StartsWith("\"", e);
+        Assert.NotEqual(e, RangeParser.ETag(1001, Written));
+        Assert.NotEqual(e, RangeParser.ETag(1000, Written.AddSeconds(1)));
+    }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("", true)]
+    [InlineData("SAME", true)]
+    [InlineData("\"other\"", false)]
+    [InlineData("W/SAME", false)]
+    [InlineData("Wed, 30 Sep 2026 12:00:00 GMT", true)]
+    [InlineData("Wed, 30 Sep 2026 12:00:01 GMT", false)]
+    [InlineData("not a date", false)]
+    public void If_range_honours_the_range_only_for_the_same_file(string? header, bool holds)
+    {
+        var etag = RangeParser.ETag(1000, Written);
+        var value = header?.Replace("SAME", etag);
+        Assert.Equal(holds, RangeParser.IfRangeHolds(value, etag, Written));
+    }
 }
