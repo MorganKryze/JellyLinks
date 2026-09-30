@@ -158,7 +158,7 @@ public class LinkStoreTests
     }
 
     [Fact]
-    public void Migrating_a_v1_database_keeps_completed_links()
+    public void Migrating_a_v1_database_rebuilds_coverage_from_every_session()
     {
         using var t = new TempStore(schema: 1);
         using (var c = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={t.DbPath}"))
@@ -170,9 +170,13 @@ public class LinkStoreTests
                 VALUES (1, '00000000-0000-0000-0000-000000000001', 0, 99, 'x', '{"RootItemIds":[],"AllVersions":false,"IncludeSubtitles":true,"ExcludedItemIds":[],"ExcludedMediaSourceIds":[]}', 'active');
                 INSERT INTO links (id, batch_id, item_id, media_source_id, file_name, size, kind) VALUES
                   (1, 1, '00000000-0000-0000-0000-00000000000a', 'a', 'a.mkv', 10, 'video'),
-                  (2, 1, '00000000-0000-0000-0000-00000000000b', 'b', 'b.mkv', 10, 'video');
+                  (2, 1, '00000000-0000-0000-0000-00000000000b', 'b', 'b.mkv', 10, 'video'),
+                  (3, 1, '00000000-0000-0000-0000-00000000000c', 'c', 'c.mkv', 10, 'video');
                 INSERT INTO sessions (link_id, ip, user_agent, first_at, last_at, bytes_sent, ranges, status, new_ip)
-                VALUES (1, '1.1.1.1', 'jd', 1, 1, 10, '0-9', 'complete', 1), (2, '1.1.1.1', 'jd', 1, 1, 4, '0-3', 'interrupted', 0);
+                VALUES (1, '1.1.1.1', 'jd', 1, 1, 10, '0-9', 'complete', 1),
+                  (2, '1.1.1.1', 'jd', 1, 1, 4, '0-3', 'interrupted', 0),
+                  (2, '2.2.2.2', 'jd', 2, 2, 6, '4-9', 'interrupted', 1),
+                  (3, '1.1.1.1', 'jd', 1, 1, 4, '0-3', 'interrupted', 0);
                 """;
             cmd.ExecuteNonQuery();
         }
@@ -184,8 +188,11 @@ public class LinkStoreTests
         var b = t.Store.GetLink(2)!;
         Assert.True(a.Complete);
         Assert.Equal("0-9", a.Covered);
-        Assert.False(b.Complete);
-        Assert.Equal(string.Empty, b.Covered);
+        Assert.True(b.Complete);
+        Assert.Equal("0-9", b.Covered);
+        var c3 = t.Store.GetLink(3)!;
+        Assert.False(c3.Complete);
+        Assert.Equal("0-3", c3.Covered);
         Assert.Equal(string.Empty, a.Title);
     }
 }

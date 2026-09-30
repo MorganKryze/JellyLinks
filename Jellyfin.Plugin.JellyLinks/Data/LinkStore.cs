@@ -32,8 +32,42 @@ public sealed partial class LinkStore
         {
             using var tx = c.BeginTransaction();
             Exec(c, Steps[v - 1], tx);
+            if (v == 2)
+            {
+                RebuildCoverage(c, tx);
+            }
+
             Exec(c, $"PRAGMA user_version = {v};", tx);
             tx.Commit();
+        }
+    }
+
+    /// <summary>v2: a link downloaded in several sessions before the upgrade is complete once all its sessions are united.</summary>
+    private static void RebuildCoverage(SqliteConnection c, SqliteTransaction tx)
+    {
+        var union = new Dictionary<long, (IReadOnlyList<(long Start, long End)> Ranges, long Size)>();
+        using (var cmd = c.CreateCommand())
+        {
+            cmd.Transaction = tx;
+            cmd.CommandText = "SELECT l.id, l.size, s.ranges FROM links l JOIN sessions s ON s.link_id = l.id WHERE l.complete = 0 ORDER BY l.id, s.id";
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var id = r.GetInt64(0);
+                var ranges = union.TryGetValue(id, out var cur) ? cur.Ranges : Array.Empty<(long Start, long End)>();
+                foreach (var (start, end) in ByteRanges.Parse(r.GetString(2)))
+                {
+                    ranges = ByteRanges.Add(ranges, start, end);
+                }
+
+                union[id] = (ranges, r.GetInt64(1));
+            }
+        }
+
+        foreach (var (id, (ranges, size)) in union)
+        {
+            Exec(c, "UPDATE links SET covered = $c, complete = $k WHERE id = $id", tx,
+                ("$c", ByteRanges.Serialize(ranges)), ("$k", ByteRanges.Covers(ranges, size) ? 1 : 0), ("$id", id));
         }
     }
 
