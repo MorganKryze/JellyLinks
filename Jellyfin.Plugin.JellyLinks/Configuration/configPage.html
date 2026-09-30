@@ -33,16 +33,16 @@
 <div class="content-primary">
   <h2 class="sectionTitle">JellyLinks</h2>
   <div id="jl-dep" class="jl-panel jl-warn" style="display:none">JavaScript Injector n'est pas actif : les utilisateurs ne voient ni le bouton « Liens » ni « Mes liens ».</div>
-  <div class="jl-tabs">
-    <button type="button" class="jl-tab on" data-tab="overview">Vue d'ensemble</button>
-    <button type="button" class="jl-tab" data-tab="batches">Lots</button>
-    <button type="button" class="jl-tab" data-tab="activity">Activité</button>
-    <button type="button" class="jl-tab" data-tab="users">Utilisateurs</button>
-    <button type="button" class="jl-tab" data-tab="settings">Réglages</button>
+  <div class="jl-tabs" role="tablist" aria-label="JellyLinks">
+    <button type="button" class="jl-tab on" data-tab="overview" id="jl-tab-overview" role="tab" aria-controls="jl-pane-overview" aria-selected="true">Vue d'ensemble</button>
+    <button type="button" class="jl-tab" data-tab="batches" id="jl-tab-batches" role="tab" aria-controls="jl-pane-batches" aria-selected="false">Lots</button>
+    <button type="button" class="jl-tab" data-tab="activity" id="jl-tab-activity" role="tab" aria-controls="jl-pane-activity" aria-selected="false">Activité</button>
+    <button type="button" class="jl-tab" data-tab="users" id="jl-tab-users" role="tab" aria-controls="jl-pane-users" aria-selected="false">Utilisateurs</button>
+    <button type="button" class="jl-tab" data-tab="settings" id="jl-tab-settings" role="tab" aria-controls="jl-pane-settings" aria-selected="false">Réglages</button>
   </div>
   <div id="jl-error" class="jl-bad jl-msg" role="alert"></div>
 
-  <div class="jl-pane on" data-pane="overview">
+  <div class="jl-pane on" data-pane="overview" id="jl-pane-overview" role="tabpanel" aria-labelledby="jl-tab-overview">
     <div class="jl-kpis" id="jl-kpis"></div>
     <h3>Volume servi par jour (30 j)</h3>
     <div id="jl-chart"></div>
@@ -52,33 +52,33 @@
     </div>
   </div>
 
-  <div class="jl-pane" data-pane="batches">
+  <div class="jl-pane" data-pane="batches" id="jl-pane-batches" role="tabpanel" aria-labelledby="jl-tab-batches">
     <div class="jl-filters">
-      <input type="search" id="jl-b-q" placeholder="Rechercher un titre, un utilisateur, une adresse IP…">
-      <select id="jl-b-state"><option value="">Tous les états</option><option value="active">actif</option><option value="blocked">bloqué</option><option value="revoked">révoqué</option><option value="expired">expiré</option></select>
-      <select id="jl-b-user"><option value="">Tous les utilisateurs</option></select>
-      <select id="jl-b-days"><option value="7">7 derniers jours</option><option value="30" selected>30 derniers jours</option><option value="90">90 derniers jours</option><option value="0">Tout</option></select>
+      <input type="search" id="jl-b-q" aria-label="Rechercher un lot" placeholder="Rechercher un titre, un utilisateur, une adresse IP…">
+      <select id="jl-b-state" aria-label="État"><option value="">Tous les états</option><option value="active">actif</option><option value="blocked">bloqué</option><option value="revoked">révoqué</option><option value="expired">expiré</option></select>
+      <select id="jl-b-user" aria-label="Utilisateur"><option value="">Tous les utilisateurs</option></select>
+      <select id="jl-b-days" aria-label="Période"><option value="7">7 derniers jours</option><option value="30" selected>30 derniers jours</option><option value="90">90 derniers jours</option><option value="0">Tout</option></select>
     </div>
     <table class="jl" id="jl-batches"></table>
     <div id="jl-batch"></div>
   </div>
 
-  <div class="jl-pane" data-pane="activity">
+  <div class="jl-pane" data-pane="activity" id="jl-pane-activity" role="tabpanel" aria-labelledby="jl-tab-activity">
     <div class="jl-filters">
-      <input type="search" id="jl-a-q" placeholder="Rechercher…">
-      <select id="jl-a-kind"><option value="">Tout</option></select>
-      <select id="jl-a-user"><option value="">Tous les utilisateurs</option></select>
-      <select id="jl-a-days"><option value="1">24 h</option><option value="7" selected>7 jours</option><option value="30">30 jours</option><option value="90">90 jours</option></select>
+      <input type="search" id="jl-a-q" aria-label="Rechercher dans l'activité" placeholder="Rechercher…">
+      <select id="jl-a-kind" aria-label="Type"><option value="">Tout</option></select>
+      <select id="jl-a-user" aria-label="Utilisateur"><option value="">Tous les utilisateurs</option></select>
+      <select id="jl-a-days" aria-label="Période"><option value="1">24 h</option><option value="7" selected>7 jours</option><option value="30">30 jours</option><option value="90">90 jours</option></select>
     </div>
     <table class="jl" id="jl-activity"></table>
   </div>
 
-  <div class="jl-pane" data-pane="users">
+  <div class="jl-pane" data-pane="users" id="jl-pane-users" role="tabpanel" aria-labelledby="jl-tab-users">
     <table class="jl" id="jl-users"></table>
     <div id="jl-user"></div>
   </div>
 
-  <div class="jl-pane" data-pane="settings">
+  <div class="jl-pane" data-pane="settings" id="jl-pane-settings" role="tabpanel" aria-labelledby="jl-tab-settings">
     <form id="jl-settings">
       <h3>Liens</h3>
       <div class="inputContainer"><label class="inputLabel" for="jl-s-validity">Validité (jours)</label><input is="emby-input" type="number" id="jl-s-validity" min="1" max="365"></div>
@@ -86,7 +86,7 @@
       <div class="inputContainer"><label class="inputLabel" for="jl-s-public">Adresse publique des liens (vide = celle de la requête)</label><input is="emby-input" type="url" id="jl-s-public" placeholder="https://jellyfin.example"></div>
       <h3>Quota global</h3>
       <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="jl-s-qon"><span>Activer le quota global</span></label>
-      <div class="inputContainer"><label class="inputLabel" for="jl-s-qvol">Volume par période (Go, 0 = illimité)</label><input is="emby-input" type="number" id="jl-s-qvol" min="0" step="1"></div>
+      <div class="inputContainer"><label class="inputLabel" for="jl-s-qvol">Volume par période (Go, 0 = illimité)</label><input is="emby-input" type="number" id="jl-s-qvol" min="0" step="any"></div>
       <div class="inputContainer"><label class="inputLabel" for="jl-s-qdays">Période glissante (jours)</label><input is="emby-input" type="number" id="jl-s-qdays" min="1" max="365"></div>
       <div class="inputContainer"><label class="inputLabel" for="jl-s-qmax">Lots actifs maximum (0 = illimité)</label><input is="emby-input" type="number" id="jl-s-qmax" min="0" max="1000"></div>
       <h3>Rétention</h3>
@@ -171,7 +171,7 @@
     return Array.isArray(e) && e.length && e.every(function (m) { return typeof m === 'string'; }) ? e : ['Erreur du serveur.'];
   }
   function msgOf(e) { return msgs(e).join(' '); }
-  function fail(e) { $('jl-error').textContent = msgOf(e); }
+  function fail(e) { if (e === STALE) { return; } $('jl-error').textContent = msgOf(e); }
   function ok(v) { $('jl-error').textContent = ''; return v; }
   function run(p) { return p.then(ok, fail); }
   function link(text, fn) { return el('button', { type: 'button', className: 'jl-link', text: text, on: { click: fn } }); }
@@ -184,6 +184,13 @@
       if (r && typeof r.json === 'function') { return r.json().then(function (j) { throw j; }, function () { throw ['Erreur du serveur (' + r.status + ').']; }); }
       throw ['Serveur injoignable.'];
     });
+  }
+  var STALE = {};
+  var seq = {};
+  /** Only the latest request of a list is rendered: a slower, older answer is dropped. */
+  function latest(name, promise) {
+    var n = seq[name] = (seq[name] || 0) + 1;
+    return promise.then(function (v) { if (seq[name] !== n) { throw STALE; } return v; });
   }
   function query(params) {
     return Object.keys(params).filter(function (k) { return params[k] !== '' && params[k] != null; })
@@ -263,7 +270,7 @@
   // ---- Lots -----------------------------------------------------------------
   var openBatch = null;
   function loadBatches() {
-    return api('GET', 'batches?' + query({ q: $('jl-b-q').value.trim(), state: $('jl-b-state').value, user: $('jl-b-user').value, days: $('jl-b-days').value }))
+    return latest('batches', api('GET', 'batches?' + query({ q: $('jl-b-q').value.trim(), state: $('jl-b-state').value, user: $('jl-b-user').value, days: $('jl-b-days').value })))
       .then(function (list) {
         table('jl-batches', ['Lot', 'Utilisateur', 'Créé', 'Avancement', 'Adresses', 'État'], list.map(function (x) {
           var b = x.Batch;
@@ -320,7 +327,7 @@
 
   // ---- Activité -------------------------------------------------------------
   function loadActivity() {
-    return api('GET', 'activity?' + query({ q: $('jl-a-q').value.trim(), kind: $('jl-a-kind').value, user: $('jl-a-user').value, days: $('jl-a-days').value }))
+    return latest('activity', api('GET', 'activity?' + query({ q: $('jl-a-q').value.trim(), kind: $('jl-a-kind').value, user: $('jl-a-user').value, days: $('jl-a-days').value })))
       .then(function (list) {
         table('jl-activity', ['Quand', 'Quoi', 'Utilisateur', 'Lot', 'Détail'], list.map(function (e) {
           return row([when(e.At), KINDS[e.Kind] || e.Kind, e.UserName, e.BatchLabel ? e.BatchLabel.split(' · ')[0] : '—', e.Detail],
@@ -349,7 +356,7 @@
   }
   function editUser(u) {
     var q = u.Quota, msg = el('div', { className: 'jl-bad jl-msg' });
-    var vol = el('input', { type: 'number', min: '0', step: '1', value: String(u.HasOverride ? Math.round(q.VolumeBytes / 1e9) : 500) });
+    var vol = el('input', { type: 'number', min: '0', step: 'any', value: String(u.HasOverride ? Number((q.VolumeBytes / 1e9).toFixed(3)) : 500) });
     var days = el('input', { type: 'number', min: '1', max: '365', value: String(u.HasOverride ? q.PeriodDays : 7) });
     var max = el('input', { type: 'number', min: '0', max: '1000', value: String(u.HasOverride ? q.MaxActiveBatches : 0) });
     function field(label, input) { return el('label', { className: 'jl-filters' }, [el('span', { text: label }), input]); }
@@ -372,7 +379,7 @@
   function loadSettings() {
     return api('GET', 'settings').then(function (s) {
       $('jl-s-validity').value = s.LinkValidityDays; $('jl-s-iplimit').value = s.IpLimit; $('jl-s-public').value = s.PublicBaseUrl;
-      $('jl-s-qon').checked = s.QuotaEnabled; $('jl-s-qvol').value = Math.round(s.QuotaVolumeBytes / 1e9);
+      $('jl-s-qon').checked = s.QuotaEnabled; $('jl-s-qvol').value = Number((s.QuotaVolumeBytes / 1e9).toFixed(3));
       $('jl-s-qdays').value = s.QuotaPeriodDays; $('jl-s-qmax').value = s.QuotaMaxActiveBatches; $('jl-s-ret').value = s.RetentionDays;
       $('jl-s-hook').value = s.WebhookUrl; $('jl-s-fmt').value = s.WebhookFormat;
       $('jl-s-n-blocked').checked = s.NotifyBatchBlocked; $('jl-s-n-ip').checked = s.NotifyNewIp;
@@ -392,7 +399,11 @@
   // ---- wiring ---------------------------------------------------------------
   var loaders = { overview: loadOverview, batches: loadBatches, activity: loadActivity, users: loadUsers, settings: loadSettings };
   function selectTab(name) {
-    Array.prototype.forEach.call(page.querySelectorAll('.jl-tab'), function (t) { t.classList.toggle('on', t.getAttribute('data-tab') === name); });
+    Array.prototype.forEach.call(page.querySelectorAll('.jl-tab'), function (t) {
+      var on = t.getAttribute('data-tab') === name;
+      t.classList.toggle('on', on);
+      t.setAttribute('aria-selected', String(on));
+    });
     Array.prototype.forEach.call(page.querySelectorAll('.jl-pane'), function (p) { p.classList.toggle('on', p.getAttribute('data-pane') === name); });
     return run(loaders[name]());
   }

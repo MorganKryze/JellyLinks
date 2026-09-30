@@ -64,14 +64,10 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         try
         {
-            var register = AssemblyLoadContext.All
-                .SelectMany(c => c.Assemblies)
-                .FirstOrDefault(a => a.GetName().Name == "Jellyfin.Plugin.JavaScriptInjector")
-                ?.GetType("Jellyfin.Plugin.JavaScriptInjector.PluginInterface")
-                ?.GetMethod("RegisterScript");
+            var register = JavaScriptInjector()?.GetMethod("RegisterScript");
             if (register is null)
             {
-                Retry(attempt, "JavaScript Injector not found");
+                Retry(attempt, "[JellyLinks] JavaScript Injector is not installed: the Links button will not appear");
                 return;
             }
 
@@ -93,7 +89,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         }
         catch (TargetInvocationException ex) when (ex.InnerException is InvalidOperationException)
         {
-            Retry(attempt, "JavaScript Injector not ready");
+            Retry(attempt, "[JellyLinks] JavaScript Injector did not become ready: the Links button will not appear until the next restart");
         }
         catch (Exception ex)
         {
@@ -101,11 +97,36 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         }
     }
 
-    private void Retry(int attempt, string why)
+    private static Type? JavaScriptInjector() =>
+        AssemblyLoadContext.All.SelectMany(c => c.Assemblies)
+            .FirstOrDefault(a => a.GetName().Name == "Jellyfin.Plugin.JavaScriptInjector")
+            ?.GetType("Jellyfin.Plugin.JavaScriptInjector.PluginInterface");
+
+    /// <summary>Removes the client script from JavaScript Injector, so no dead button stays behind after an uninstall.</summary>
+    public override void OnUninstalling()
+    {
+        try
+        {
+            var unregister = JavaScriptInjector()?.GetMethod("UnregisterAllScriptsFromPlugin");
+            var parameters = unregister?.GetParameters();
+            if (unregister is not null && parameters!.Length == 1)
+            {
+                unregister.Invoke(null, new object[] { parameters[0].ParameterType == typeof(Guid) ? Id : Id.ToString() });
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "[JellyLinks] could not remove the client script from JavaScript Injector");
+        }
+
+        base.OnUninstalling();
+    }
+
+    private void Retry(int attempt, string message)
     {
         if (attempt >= MaxAttempts)
         {
-            _log.LogWarning("[JellyLinks] {Why}: the Links button will not appear (install JavaScript Injector)", why);
+            _log.LogWarning("{Message}", message);
             return;
         }
 

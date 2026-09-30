@@ -6,7 +6,7 @@ default:
 
 # Build the plugin
 build:
-	dotnet build --configuration Release
+	dotnet build --configuration Release --no-incremental
 
 # Run server and client tests
 test:
@@ -31,8 +31,8 @@ v12: build
 
 # Stop all containers
 down:
-	docker compose -f docker/compose.v10.yml down
-	docker compose -f docker/compose.v12.yml down
+	-docker compose -f docker/compose.v10.yml down
+	-docker compose -f docker/compose.v12.yml down
 
 # Follow v10 logs
 logs10:
