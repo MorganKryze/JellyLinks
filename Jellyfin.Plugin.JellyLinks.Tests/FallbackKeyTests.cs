@@ -5,6 +5,8 @@ namespace JellyLinks.Tests;
 
 public class FallbackKeyTests
 {
+    private static readonly Guid Library = Guid.NewGuid();
+
     private static FallbackKey Movie(string? version, int count) =>
         new("Movie", new Dictionary<string, string>(), "Dune", 2024, null, null, null, null, version, count, null);
 
@@ -12,27 +14,31 @@ public class FallbackKeyTests
     public void Round_trips_through_json()
     {
         var k = new FallbackKey("Episode", new Dictionary<string, string> { ["Tvdb"] = "1" }, "E1", null, "key",
-            new Dictionary<string, string> { ["Tmdb"] = "8666" }, 1, 2, null, 1, ".fr.srt");
+            new Dictionary<string, string> { ["Tmdb"] = "8666" }, 1, 2, null, 1, ".fr.srt", Library);
         var back = FallbackKey.FromJson(k.ToJson())!;
         Assert.Equal("key", back.SeriesKey);
         Assert.Equal(2, back.Episode);
+        Assert.Equal(Library, back.LibraryId);
+        Assert.Null(FallbackKey.FromJson("{\"Kind\":\"Movie\",\"ProviderIds\":{},\"Name\":\"Dune\",\"VersionCount\":1}")!.LibraryId);
         Assert.Equal("8666", back.SeriesProviderIds!["Tmdb"]);
         Assert.Null(FallbackKey.FromJson(null));
         Assert.Null(FallbackKey.FromJson("{not json"));
     }
 
     [Fact]
-    public void Picks_the_only_source_the_same_version_or_the_default_one()
+    public void Picks_the_same_version_or_the_only_source_of_a_single_version_file()
     {
-        Assert.Equal(0, Movie("1080p", 2).PickSource(new string?[] { "2160p" }));
+        Assert.Equal(0, Movie("1080p", 1).PickSource(new string?[] { "2160p" }));
         Assert.Equal(1, Movie("720p", 2).PickSource(new string?[] { "1080p", "720p" }));
-        Assert.Equal(0, Movie("Dune", 1).PickSource(new string?[] { "2160p", "1080p" }));
+        Assert.Equal(0, Movie("720p", 2).PickSource(new string?[] { "720p" }));
     }
 
     [Fact]
     public void Two_versions_without_the_same_name_are_ambiguous()
     {
         Assert.Null(Movie("720p", 2).PickSource(new string?[] { "2160p", "1080p" }));
+        Assert.Null(Movie("Dune", 1).PickSource(new string?[] { "2160p", "1080p" }));
+        Assert.Null(Movie("720p", 2).PickSource(new string?[] { "1080p" })); // the alternate was deleted
         Assert.Null(Movie("720p", 2).PickSource(Array.Empty<string?>()));
     }
 

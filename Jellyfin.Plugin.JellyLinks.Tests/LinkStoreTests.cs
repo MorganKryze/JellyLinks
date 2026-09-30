@@ -65,6 +65,43 @@ public class LinkStoreTests
     }
 
     [Fact]
+    public void Relink_restarts_the_coverage_and_the_session_ranges_of_an_incomplete_link()
+    {
+        using var t = new TempStore();
+        var id = t.Store.CreateBatch(User, 100, 200, "x", TempStore.AnySelection(Item),
+            new[] { TempStore.Video(Item, "a.mkv", 1000) });
+        var link = t.Store.GetLinks(id)[0];
+        var session = t.Store.InsertSession(new SessionRecord(0, link.Id, "1.1.1.1", "jd", 100, 100, 900, "0-899", SessionStatuses.InProgress, true));
+        t.Store.AddCoverage(link.Id, 0, 899, 1000);
+
+        var moved = Guid.NewGuid();
+        t.Store.Relink(link.Id, moved, moved.ToString("N"), null, 2000);
+
+        var after = t.Store.GetLink(link.Id)!;
+        Assert.Equal(moved, after.ItemId);
+        Assert.Equal(2000, after.Size);
+        Assert.Equal("", after.Covered);
+        Assert.Equal("", t.Store.GetSession(session)!.Ranges);
+    }
+
+    [Fact]
+    public void Relink_keeps_the_coverage_of_a_complete_link()
+    {
+        using var t = new TempStore();
+        var id = t.Store.CreateBatch(User, 100, 200, "x", TempStore.AnySelection(Item),
+            new[] { TempStore.Video(Item, "a.mkv", 1000) });
+        var link = t.Store.GetLinks(id)[0];
+        var session = t.Store.InsertSession(new SessionRecord(0, link.Id, "1.1.1.1", "jd", 100, 100, 1000, "0-999", SessionStatuses.Complete, true));
+        t.Store.AddCoverage(link.Id, 0, 999, 1000);
+
+        t.Store.Relink(link.Id, Guid.NewGuid(), "x", null, 2000);
+
+        Assert.True(t.Store.GetLink(link.Id)!.Complete);
+        Assert.Equal("0-999", t.Store.GetLink(link.Id)!.Covered);
+        Assert.Equal("0-999", t.Store.GetSession(session)!.Ranges);
+    }
+
+    [Fact]
     public void Usage_sums_from_a_day()
     {
         using var t = new TempStore();

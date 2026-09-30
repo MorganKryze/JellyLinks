@@ -209,6 +209,22 @@ public sealed class FileGateTests : IDisposable
         Assert.Equal(GateOutcome.Gone, (await _gate.CheckAsync(Token(), "1.1.1.1", false)).Outcome);
     }
 
+    [Fact]
+    public async Task A_file_that_vanishes_before_the_relink_is_gone()
+    {
+        var newItem = Guid.NewGuid();
+        _lib.MovedTo = new LocatedFile(Path.Combine(Path.GetTempPath(), $"jl-{Guid.NewGuid():N}", "x.mkv"), newItem, newItem.ToString("N"), null);
+        Assert.Equal(GateOutcome.Gone, (await _gate.CheckAsync(Token(), "1.1.1.1", false)).Outcome);
+        _lib.MovedTo = MovedTo(Path.Combine(Path.GetTempPath(), $"jl-{Guid.NewGuid():N}.mkv"));
+        Assert.Equal(GateOutcome.Gone, (await _gate.CheckAsync(Token(), "1.1.1.1", false)).Outcome);
+    }
+
+    private static LocatedFile MovedTo(string path)
+    {
+        var item = Guid.NewGuid();
+        return new LocatedFile(path, item, item.ToString("N"), null);
+    }
+
     public void Dispose()
     {
         _t.Dispose();

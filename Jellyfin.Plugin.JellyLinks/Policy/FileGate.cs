@@ -74,7 +74,17 @@ public sealed class FileGate
         if (found.ItemId != link.ItemId || found.StreamIndex != link.StreamIndex
             || !string.Equals(found.MediaSourceId, link.MediaSourceId, StringComparison.OrdinalIgnoreCase))
         {
-            _store.Relink(link.Id, found.ItemId, found.MediaSourceId, found.StreamIndex, new FileInfo(found.Path).Length);
+            long size;
+            try
+            {
+                size = new FileInfo(found.Path).Length;
+            }
+            catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException)
+            {
+                return Deny(GateOutcome.Gone, link, batch); // vanished since Locate
+            }
+
+            _store.Relink(link.Id, found.ItemId, found.MediaSourceId, found.StreamIndex, size);
             link = _store.GetLink(link.Id)!;
         }
 

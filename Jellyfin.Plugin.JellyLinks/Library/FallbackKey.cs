@@ -5,6 +5,7 @@ namespace Jellyfin.Plugin.JellyLinks.Library;
 /// <summary>
 /// What identifies a link's file besides its Jellyfin id, which is derived from the path and changes on rename.
 /// Kind is "Movie" or "Episode"; for a movie the key describes the primary item (alternates are reached through it).
+/// LibraryId is the item's top parent: a replacement is only looked for in the same library.
 /// </summary>
 public sealed record FallbackKey(
     string Kind,
@@ -17,7 +18,8 @@ public sealed record FallbackKey(
     int? Episode,
     string? Version,
     int VersionCount,
-    string? SubtitleSuffix)
+    string? SubtitleSuffix,
+    Guid? LibraryId = null)
 {
     public string ToJson() => JsonSerializer.Serialize(this);
 
@@ -39,16 +41,11 @@ public sealed record FallbackKey(
     }
 
     /// <summary>
-    /// Index of the source to serve: the only one, the one with the same version name, or the default one when the
-    /// file had a single version at creation. Null when it would be a guess.
+    /// Index of the source to serve: the one with the same version name, else the only source when the file had a single
+    /// version at creation. Null when it would be a guess.
     /// </summary>
     public int? PickSource(IReadOnlyList<string?> sourceNames)
     {
-        if (sourceNames.Count == 1)
-        {
-            return 0;
-        }
-
         var same = Enumerable.Range(0, sourceNames.Count)
             .Where(i => Version is not null && string.Equals(sourceNames[i], Version, StringComparison.OrdinalIgnoreCase))
             .ToList();
@@ -57,7 +54,7 @@ public sealed record FallbackKey(
             return same[0];
         }
 
-        return VersionCount == 1 && sourceNames.Count > 0 ? 0 : null;
+        return VersionCount == 1 && sourceNames.Count == 1 ? 0 : null;
     }
 
     /// <summary>".fr.srt" for "Film (2020).fr.srt" next to "Film (2020).mkv"; null when the names do not share a stem.</summary>

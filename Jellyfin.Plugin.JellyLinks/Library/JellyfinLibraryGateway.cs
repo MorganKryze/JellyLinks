@@ -167,7 +167,8 @@ public sealed class JellyfinLibraryGateway : ILibraryGateway
             episode?.IndexNumber,
             version,
             versionCount,
-            subtitleSuffix);
+            subtitleSuffix,
+            video.GetTopParent()?.Id);
     }
 
     /// <summary>The link's file on this item: the stored source (or, after a rename, the one the key picks); subtitles by suffix first.</summary>
@@ -222,17 +223,21 @@ public sealed class JellyfinLibraryGateway : ILibraryGateway
                 .Where(c => key.ProviderIds.All(p => c.ProviderIds is null || !c.ProviderIds.TryGetValue(p.Key, out var v)
                     || string.Equals(v, p.Value, StringComparison.OrdinalIgnoreCase)));
         }
-        else if (key.Kind == "Movie")
+        else if (key.Kind == "Movie" && key.Year is int year)
         {
             found = Query(user, BaseItemKind.Movie, q =>
             {
                 q.Name = key.Name;
-                q.Years = key.Year is int y ? new[] { y } : Array.Empty<int>();
+                q.Years = new[] { year };
             });
         }
 
         // Series / ancestor filters skip Jellyfin's per-user library filter: re-check every candidate.
-        return found.Where(c => Visible(c.Id, user) is not null).ToList();
+        // The same film can sit in two libraries (HD and 4K): only the original library counts.
+        return found
+            .Where(c => key.LibraryId is not Guid library || c.GetTopParent()?.Id == library)
+            .Where(c => Visible(c.Id, user) is not null)
+            .ToList();
     }
 
     private IEnumerable<BaseItem> Episodes(User user, string? seriesKey, int season, int number) =>
