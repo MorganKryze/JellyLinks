@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Jellyfin.Plugin.JellyLinks.Configuration;
 using Jellyfin.Plugin.JellyLinks.Data;
 using Jellyfin.Plugin.JellyLinks.Library;
+using Jellyfin.Plugin.JellyLinks.Notify;
 using Jellyfin.Plugin.JellyLinks.Policy;
 using Jellyfin.Plugin.JellyLinks.Serving;
 using Jellyfin.Plugin.JellyLinks.Signing;
@@ -65,15 +66,17 @@ public sealed class BatchesController : ControllerBase
     private readonly QuotaService _quotas;
     private readonly Func<PluginConfiguration> _config;
     private readonly TimeProvider _clock;
+    private readonly Notifier _notifier;
 
     public BatchesController(LinkStore store, ILibraryGateway library, QuotaService quotas,
-                             Func<PluginConfiguration> config, TimeProvider clock)
+                             Func<PluginConfiguration> config, TimeProvider clock, Notifier notifier)
     {
         _store = store;
         _library = library;
         _quotas = quotas;
         _config = config;
         _clock = clock;
+        _notifier = notifier;
     }
 
     private Guid UserId => Guid.Parse(User.FindFirstValue("Jellyfin-UserId")!);
@@ -122,6 +125,7 @@ public sealed class BatchesController : ControllerBase
         if (BatchStates.Effective(b.State, b.ExpiresAt, Now) == BatchStates.Active)
         {
             _store.SetBatchState(id, BatchStates.Revoked, "révoqué par l'utilisateur");
+            _ = _notifier.PublishAsync(new LinkEvent(EventKind.BatchRevoked, UserId, _library.UserName(UserId), b.Label, b.Id, "révoqué par l'utilisateur"));
         }
 
         return NoContent();
@@ -161,8 +165,11 @@ public sealed class BatchesController : ControllerBase
         }
 
         var now = Now;
-        var id = _store.CreateBatch(UserId, now, now + (_config().LinkValidityDays * 86_400L), BatchLabel.For(files), selection,
+        var label = BatchLabel.For(files);
+        var id = _store.CreateBatch(UserId, now, now + (_config().LinkValidityDays * 86_400L), label, selection,
             files.Select(f => new LinkRecord(0, 0, f.ItemId, f.MediaSourceId, f.FileName, f.Size, f.Kind, f.StreamIndex, f.Title, f.Fallback)).ToList());
+        _ = _notifier.PublishAsync(new LinkEvent(EventKind.BatchCreated, UserId, _library.UserName(UserId), label, id,
+            $"{files.Count} fichier{(files.Count > 1 ? "s" : string.Empty)}"));
         return ToResponse(_store.GetBatch(id)!);
     }
 

@@ -29,7 +29,9 @@ public sealed class MaintenanceRunner
         var interrupted = _store.MarkInterrupted(now - SessionTracker.IdleSeconds);
         var abandoned = _store.MarkAbandoned(now);
         var purged = _store.AggregateAndPurge(now - (retention * 86_400L));
-        _store.PurgeUsage((now / 86_400) - Math.Max(retention, c.QuotaPeriodDays));
+        // Keep usage as long as any quota window (global or exception) still counts it.
+        var window = Math.Max(retention, Math.Max(c.QuotaPeriodDays, _store.MaxOverridePeriodDays()));
+        _store.PurgeUsage((now / 86_400) - window);
 
         return new MaintenanceReport(expired, interrupted, abandoned, purged);
     }

@@ -86,6 +86,7 @@ public sealed class FileGate
 
             _store.Relink(link.Id, found.ItemId, found.MediaSourceId, found.StreamIndex, size);
             link = _store.GetLink(link.Id)!;
+            await Publish(EventKind.LinkMoved, batch, $"{link.FileName} retrouvé après renommage").ConfigureAwait(false);
         }
 
         var path = found.Path;

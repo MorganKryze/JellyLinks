@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Time.Testing;
+using Jellyfin.Plugin.JellyLinks.Data;
 using Jellyfin.Plugin.JellyLinks.Configuration;
 using Jellyfin.Plugin.JellyLinks.Notify;
 using JellyLinks.Tests.Fakes;
@@ -33,5 +35,42 @@ public class NotifierTests
         var n = new Notifier(sink, new ThrowingHttp(), () => cfg, NullLogger<Notifier>.Instance);
         await n.PublishAsync(Ev);
         Assert.Single(sink.Events);
+    }
+
+    [Fact]
+    public async Task Every_event_is_journaled_but_only_alerts_reach_the_activity_log()
+    {
+        using var t = new TempStore();
+        var sink = new FakeActivitySink();
+        var n = new Notifier(sink, new ThrowingHttp(), () => new PluginConfiguration(), NullLogger<Notifier>.Instance,
+            t.Store, new FakeTimeProvider(DateTimeOffset.FromUnixTimeSeconds(1_800_000_000)));
+
+        await n.PublishAsync(new LinkEvent(EventKind.BatchCreated, Guid.NewGuid(), "camille", "Dune", 1, "1 fichier"));
+        await n.PublishAsync(new LinkEvent(EventKind.NewIp, Guid.NewGuid(), "camille", "Dune", 1, "adresse 1.1.1.1"));
+
+        Assert.Single(sink.Events);
+        Assert.Equal(EventKind.NewIp, sink.Events[0].Kind);
+        Assert.Equal(2, t.Store.ListEvents(new EventQuery(null, null, null, null, null)).Count);
+    }
+
+    [Fact]
+    public async Task Quota_reached_is_announced_once_a_day_per_user()
+    {
+        using var t = new TempStore();
+        var sink = new FakeActivitySink();
+        var clock = new FakeTimeProvider(DateTimeOffset.FromUnixTimeSeconds(1_800_000_000));
+        var n = new Notifier(sink, new ThrowingHttp(), () => new PluginConfiguration(), NullLogger<Notifier>.Instance, t.Store, clock);
+        var user = Guid.NewGuid();
+        var e = new LinkEvent(EventKind.QuotaReached, user, "camille", "Dune", 1, "quota");
+
+        await n.PublishAsync(e);
+        clock.Advance(TimeSpan.FromHours(23));
+        await n.PublishAsync(e);
+        await n.PublishAsync(e with { UserId = Guid.NewGuid() });
+        clock.Advance(TimeSpan.FromHours(2));
+        await n.PublishAsync(e);
+
+        Assert.Equal(3, sink.Events.Count);
+        Assert.Equal(3, t.Store.ListEvents(new EventQuery(null, "QuotaReached", null, null, null)).Count);
     }
 }

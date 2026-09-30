@@ -85,4 +85,24 @@ public class MaintenanceRunnerTests
         cmd.CommandText = "SELECT group_concat(ip) FROM batch_ips";
         Assert.Equal("2.2.2.2", cmd.ExecuteScalar());
     }
+
+    [Fact]
+    public void Usage_is_kept_as_long_as_a_quota_exception_counts_it_and_old_events_go()
+    {
+        using var t = new TempStore();
+        var now = 1_800_000_000L;
+        var clock = new FakeTimeProvider(DateTimeOffset.FromUnixTimeSeconds(now));
+        var user = Guid.NewGuid();
+        t.Store.SetQuotaOverride(new QuotaOverride(user, 1000, 120, 0), user);
+        t.Store.AddUsage(user, (now / Day) - 100, 7);
+        t.Store.AddEvent(now - (100 * Day), "NewIp", user, null, "adresse 1.1.1.1");
+        t.Store.AddEvent(now - Day, "NewIp", user, null, "adresse 2.2.2.2");
+
+        new MaintenanceRunner(t.Store, () => new PluginConfiguration(), clock).Run();
+
+        Assert.Equal(7, t.Store.GetUsageSince(user, 0));
+        var left = t.Store.ListEvents(new EventQuery(null, null, null, null, null));
+        Assert.Single(left);
+        Assert.Contains("2.2.2.2", left[0].Detail);
+    }
 }

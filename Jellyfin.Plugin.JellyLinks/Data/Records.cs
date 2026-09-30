@@ -44,3 +44,8 @@ public sealed record QuotaOverride(Guid UserId, long VolumeBytes, int PeriodDays
 
 /// <summary>Outcome of recording an address for a batch. Distinct includes this address.</summary>
 public readonly record struct IpAdmission(bool IsNew, int Distinct, bool OverLimit);
+
+public sealed record EventRow(long Id, long At, string Kind, Guid UserId, long? BatchId, string? BatchLabel, string Detail);
+
+/// <summary>Journal filter. Text matches the detail or the batch label; TextUserIds are users whose name matched the text.</summary>
+public sealed record EventQuery(string? Text, string? Kind, Guid? UserId, long? Since, IReadOnlyList<Guid>? TextUserIds, int Limit = 500);

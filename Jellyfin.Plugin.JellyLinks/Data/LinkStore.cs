@@ -338,9 +338,43 @@ public sealed class LinkStore
             """, tx, ("$t", before));
         var n = Exec(c, "DELETE FROM sessions WHERE last_at < $t", tx, ("$t", before));
         Exec(c, "DELETE FROM batch_ips WHERE first_at < $t", tx, ("$t", before));
+        Exec(c, "DELETE FROM events WHERE at < $t", tx, ("$t", before)); // details carry addresses: same retention
         tx.Commit();
         return n;
     }
+
+    public void AddEvent(long at, string kind, Guid userId, long? batchId, string detail) =>
+        Exec("INSERT INTO events (at, kind, user_id, batch_id, detail) VALUES ($a, $k, $u, $b, $d)",
+            ("$a", at), ("$k", kind), ("$u", userId.ToString()), ("$b", (object?)batchId ?? DBNull.Value), ("$d", detail));
+
+    public IReadOnlyList<EventRow> ListEvents(EventQuery q) =>
+        Query("""
+            SELECT e.id, e.at, e.kind, e.user_id, e.batch_id, b.label, e.detail
+            FROM events e LEFT JOIN batches b ON b.id = e.batch_id
+            WHERE ($kind IS NULL OR e.kind = $kind)
+              AND ($user IS NULL OR e.user_id = $user)
+              AND ($since IS NULL OR e.at >= $since)
+              AND ($like IS NULL OR e.detail LIKE $like ESCAPE '\' OR b.label LIKE $like ESCAPE '\'
+                   OR e.user_id IN (SELECT value FROM json_each($uids)))
+            ORDER BY e.at DESC, e.id DESC LIMIT $limit;
+            """,
+            r => new EventRow(r.GetInt64(0), r.GetInt64(1), r.GetString(2), Guid.Parse(r.GetString(3)),
+                r.IsDBNull(4) ? null : r.GetInt64(4), r.IsDBNull(5) ? null : r.GetString(5), r.GetString(6)),
+            ("$kind", (object?)q.Kind ?? DBNull.Value), ("$user", (object?)q.UserId?.ToString() ?? DBNull.Value),
+            ("$since", (object?)q.Since ?? DBNull.Value), ("$like", (object?)Like(q.Text) ?? DBNull.Value),
+            ("$uids", Ids(q.TextUserIds)), ("$limit", q.Limit));
+
+    public int MaxOverridePeriodDays() =>
+        Convert.ToInt32(Scalar("SELECT COALESCE(MAX(period_days), 0) FROM quota_overrides;"), CultureInfo.InvariantCulture);
+
+    /// <summary>"%text%" with LIKE wildcards escaped, or null for an empty search.</summary>
+    internal static string? Like(string? text) =>
+        string.IsNullOrWhiteSpace(text)
+            ? null
+            : "%" + text.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
+
+    internal static string Ids(IReadOnlyList<Guid>? ids) =>
+        JsonSerializer.Serialize((ids ?? Array.Empty<Guid>()).Select(i => i.ToString()));
 
     public int PurgeUsage(long beforeDay) => Exec("DELETE FROM usage WHERE day < $d", ("$d", beforeDay));
 
