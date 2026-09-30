@@ -60,6 +60,10 @@ Then install **JellyLinks** from the Catalog and restart Jellyfin.
 Only users with **"Allow media downloading"** (user profile → access) see the Links button — that
 permission is re-checked on every request.
 
+Uninstalling keeps the plugin's data (database and signing key) in `plugins/Jellyfin.Plugin.JellyLinks/`, so a
+reinstall or an update keeps your batches; delete that folder to wipe everything (a reinstall otherwise brings
+back the links that have not expired).
+
 ## Behind a reverse proxy
 
 - Declare your proxies in **Dashboard → Networking → Known proxies**, otherwise every download seems to
