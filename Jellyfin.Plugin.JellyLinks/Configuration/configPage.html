@@ -1,14 +1,429 @@
 <!DOCTYPE html>
-<html>
-<head><title>JellyLinks</title></head>
+<html lang="fr">
+<head><meta charset="utf-8"><title>JellyLinks</title></head>
 <body>
-  <div data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-button">
-    <div data-role="content">
-      <div class="content-primary">
-        <h2>JellyLinks</h2>
-        <p>Settings are edited through the API until the admin panel ships.</p>
-      </div>
+<div id="JellyLinksConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox,emby-select">
+<style>
+  #JellyLinksConfigPage .jl-tabs{display:flex;flex-wrap:wrap;border-bottom:1px solid rgba(128,128,128,.3);margin-bottom:1.2em}
+  #JellyLinksConfigPage .jl-tab{background:none;border:0;border-bottom:2px solid transparent;color:inherit;padding:.7em 1.1em;margin-bottom:-1px;cursor:pointer;opacity:.65;font:inherit}
+  #JellyLinksConfigPage .jl-tab.on{opacity:1;border-bottom-color:#00a4dc}
+  #JellyLinksConfigPage .jl-pane{display:none}
+  #JellyLinksConfigPage .jl-pane.on{display:block}
+  #JellyLinksConfigPage .jl-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.6em;margin-bottom:1em}
+  #JellyLinksConfigPage .jl-kpi{background:rgba(128,128,128,.12);border-radius:8px;padding:.7em}
+  #JellyLinksConfigPage .jl-kpi b{display:block;font-size:1.5em}
+  #JellyLinksConfigPage .jl-muted{opacity:.65;font-size:.9em}
+  #JellyLinksConfigPage table.jl{width:100%;border-collapse:collapse;margin:.5em 0}
+  #JellyLinksConfigPage table.jl th,#JellyLinksConfigPage table.jl td{padding:.45em .35em;border-bottom:1px solid rgba(128,128,128,.2);text-align:left;vertical-align:top}
+  #JellyLinksConfigPage table.jl th{opacity:.65;font-weight:500}
+  #JellyLinksConfigPage table.jl tr.jl-click{cursor:pointer}
+  #JellyLinksConfigPage .jl-filters{display:flex;flex-wrap:wrap;gap:.5em;margin-bottom:.8em}
+  #JellyLinksConfigPage .jl-filters input,#JellyLinksConfigPage .jl-filters select{background:rgba(128,128,128,.12);color:inherit;border:1px solid rgba(128,128,128,.35);border-radius:6px;padding:.45em .6em;font:inherit}
+  #JellyLinksConfigPage .jl-filters input[type=search]{flex:1;min-width:220px}
+  #JellyLinksConfigPage .jl-panel{background:rgba(128,128,128,.1);border-radius:8px;padding:.9em;margin:.8em 0}
+  #JellyLinksConfigPage .jl-link{background:none;border:0;color:#00a4dc;cursor:pointer;padding:0;margin-right:1em;font:inherit}
+  #JellyLinksConfigPage .jl-ok{color:#3fb950}#JellyLinksConfigPage .jl-warn{color:#f0b429}#JellyLinksConfigPage .jl-off{color:#8b8b8b}#JellyLinksConfigPage .jl-bad{color:#f85149}
+  #JellyLinksConfigPage .jl-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1em}
+  #JellyLinksConfigPage .jl-legend span{display:inline-block;margin-right:1em}
+  #JellyLinksConfigPage .jl-legend i{display:inline-block;width:.8em;height:.8em;border-radius:2px;margin-right:.3em;vertical-align:middle}
+  #JellyLinksConfigPage .jl-msg{padding:.5em 0}
+  #JellyLinksConfigPage .jl-danger{border:1px solid rgba(248,81,73,.5)}
+</style>
+<div data-role="content">
+<div class="content-primary">
+  <h2 class="sectionTitle">JellyLinks</h2>
+  <div id="jl-dep" class="jl-panel jl-warn" style="display:none">JavaScript Injector n'est pas actif : les utilisateurs ne voient ni le bouton « Liens » ni « Mes liens ».</div>
+  <div class="jl-tabs">
+    <button type="button" class="jl-tab on" data-tab="overview">Vue d'ensemble</button>
+    <button type="button" class="jl-tab" data-tab="batches">Lots</button>
+    <button type="button" class="jl-tab" data-tab="activity">Activité</button>
+    <button type="button" class="jl-tab" data-tab="users">Utilisateurs</button>
+    <button type="button" class="jl-tab" data-tab="settings">Réglages</button>
+  </div>
+
+  <div class="jl-pane on" data-pane="overview">
+    <div class="jl-kpis" id="jl-kpis"></div>
+    <h3>Volume servi par jour (30 j)</h3>
+    <div id="jl-chart"></div>
+    <div class="jl-cols">
+      <div><h3>Top titres (30 j)</h3><table class="jl" id="jl-top-titles"></table></div>
+      <div><h3>Top utilisateurs (30 j)</h3><table class="jl" id="jl-top-users"></table></div>
     </div>
   </div>
+
+  <div class="jl-pane" data-pane="batches">
+    <div class="jl-filters">
+      <input type="search" id="jl-b-q" placeholder="Rechercher un titre, un utilisateur, une adresse IP…">
+      <select id="jl-b-state"><option value="">Tous les états</option><option value="active">actif</option><option value="blocked">bloqué</option><option value="revoked">révoqué</option><option value="expired">expiré</option></select>
+      <select id="jl-b-user"><option value="">Tous les utilisateurs</option></select>
+      <select id="jl-b-days"><option value="7">7 derniers jours</option><option value="30" selected>30 derniers jours</option><option value="90">90 derniers jours</option><option value="0">Tout</option></select>
+    </div>
+    <table class="jl" id="jl-batches"></table>
+    <div id="jl-batch"></div>
+  </div>
+
+  <div class="jl-pane" data-pane="activity">
+    <div class="jl-filters">
+      <input type="search" id="jl-a-q" placeholder="Rechercher…">
+      <select id="jl-a-kind"><option value="">Tout</option></select>
+      <select id="jl-a-user"><option value="">Tous les utilisateurs</option></select>
+      <select id="jl-a-days"><option value="1">24 h</option><option value="7" selected>7 jours</option><option value="30">30 jours</option><option value="90">90 jours</option></select>
+    </div>
+    <table class="jl" id="jl-activity"></table>
+  </div>
+
+  <div class="jl-pane" data-pane="users">
+    <table class="jl" id="jl-users"></table>
+    <div id="jl-user"></div>
+  </div>
+
+  <div class="jl-pane" data-pane="settings">
+    <form id="jl-settings">
+      <h3>Liens</h3>
+      <div class="inputContainer"><label class="inputLabel" for="jl-s-validity">Validité (jours)</label><input is="emby-input" type="number" id="jl-s-validity" min="1" max="365"></div>
+      <div class="inputContainer"><label class="inputLabel" for="jl-s-iplimit">Limite d'adresses distinctes par lot (0 = sans limite)</label><input is="emby-input" type="number" id="jl-s-iplimit" min="0" max="100"></div>
+      <div class="inputContainer"><label class="inputLabel" for="jl-s-public">Adresse publique des liens (vide = celle de la requête)</label><input is="emby-input" type="url" id="jl-s-public" placeholder="https://jellyfin.example"></div>
+      <h3>Quota global</h3>
+      <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="jl-s-qon"><span>Activer le quota global</span></label>
+      <div class="inputContainer"><label class="inputLabel" for="jl-s-qvol">Volume par période (Go, 0 = illimité)</label><input is="emby-input" type="number" id="jl-s-qvol" min="0" step="1"></div>
+      <div class="inputContainer"><label class="inputLabel" for="jl-s-qdays">Période glissante (jours)</label><input is="emby-input" type="number" id="jl-s-qdays" min="1" max="365"></div>
+      <div class="inputContainer"><label class="inputLabel" for="jl-s-qmax">Lots actifs maximum (0 = illimité)</label><input is="emby-input" type="number" id="jl-s-qmax" min="0" max="1000"></div>
+      <h3>Rétention</h3>
+      <div class="inputContainer"><label class="inputLabel" for="jl-s-ret">Détail des sessions conservé (jours) ; au-delà, totaux sans adresse</label><input is="emby-input" type="number" id="jl-s-ret" min="7" max="3650"></div>
+      <h3>Webhook</h3>
+      <div class="inputContainer"><label class="inputLabel" for="jl-s-hook">URL</label><input is="emby-input" type="url" id="jl-s-hook" placeholder="https://ntfy.example/jellylinks"></div>
+      <div class="selectContainer"><label class="selectLabel" for="jl-s-fmt">Format</label><select is="emby-select" id="jl-s-fmt"><option value="ntfy">ntfy</option><option value="json">JSON</option></select></div>
+      <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="jl-s-n-blocked"><span>Lot bloqué</span></label>
+      <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="jl-s-n-ip"><span>Nouvelle adresse</span></label>
+      <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="jl-s-n-quota"><span>Quota atteint</span></label>
+      <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="jl-s-n-done"><span>Lot entièrement téléchargé</span></label>
+      <div><button is="emby-button" type="button" id="jl-s-test" class="raised"><span>Tester le webhook</span></button> <span id="jl-s-test-msg" class="jl-muted"></span></div>
+      <div id="jl-s-errors" class="jl-bad jl-msg"></div>
+      <button is="emby-button" type="submit" class="raised button-submit block"><span>Enregistrer</span></button>
+    </form>
+    <div class="jl-panel jl-danger">
+      <h3>Tout révoquer</h3>
+      <p class="jl-muted">Renouvelle le secret de signature : tous les liens déjà distribués cessent de fonctionner, et tous les lots ouverts sont révoqués.</p>
+      <button is="emby-button" type="button" id="jl-revoke-all" class="raised"><span>Tout révoquer…</span></button>
+      <span id="jl-revoke-msg" class="jl-muted"></span>
+    </div>
+  </div>
+</div>
+</div>
+
+<script type="text/javascript">
+/* global ApiClient */
+(function () {
+  'use strict';
+  var page = document.getElementById('JellyLinksConfigPage');
+  var FR = 'fr-FR';
+  var KINDS = {
+    Session: 'Session', BatchCreated: 'Lot créé', NewIp: 'Nouvelle adresse', BatchBlocked: 'Lot bloqué', QuotaReached: 'Quota atteint',
+    BatchCompleted: 'Lot téléchargé', BatchRevoked: 'Lot révoqué', BatchUnblocked: 'Lot débloqué', LinkMoved: 'Fichier retrouvé', AllRevoked: 'Tout révoqué'
+  };
+  var STATES = { active: ['actif', 'jl-ok'], blocked: ['bloqué', 'jl-bad'], revoked: ['révoqué', 'jl-off'], expired: ['expiré', 'jl-off'] };
+  var SESSION = { in_progress: ['en cours', 'jl-warn'], complete: ['terminé', 'jl-ok'], interrupted: ['interrompu', 'jl-warn'], abandoned: ['abandonné', 'jl-off'] };
+  var PALETTE = ['#00a4dc', '#f0b429', '#3fb950', '#f85149', '#a371f7', '#ff7b72', '#79c0ff', '#d2a8ff'];
+  var users = [];
+
+  function $(id) { return document.getElementById(id); }
+  function el(tag, props, kids) {
+    var e = document.createElement(tag);
+    Object.keys(props || {}).forEach(function (k) {
+      if (k === 'text') { e.textContent = props[k]; }
+      else if (k === 'on') { Object.keys(props.on).forEach(function (ev) { e.addEventListener(ev, props.on[ev]); }); }
+      else if (k === 'attrs') { Object.keys(props.attrs).forEach(function (a) { e.setAttribute(a, props.attrs[a]); }); }
+      else { e[k] = props[k]; }
+    });
+    (kids || []).forEach(function (c) { if (c != null) { e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); } });
+    return e;
+  }
+  function bytes(n) {
+    var u = ['o', 'Ko', 'Mo', 'Go', 'To'], i = 0;
+    while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; }
+    return (i === 0 ? String(n) : n.toLocaleString(FR, { minimumFractionDigits: 1, maximumFractionDigits: 1 })) + ' ' + u[i];
+  }
+  function when(unix) { return new Date(unix * 1000).toLocaleString(FR, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); }
+  function duration(s) { return s < 60 ? s + ' s' : (s < 3600 ? Math.round(s / 60) + ' min' : (s / 3600).toLocaleString(FR, { maximumFractionDigits: 1 }) + ' h'); }
+  function badge(map, key) { var v = map[key] || [key, '']; return el('span', { className: v[1], text: v[0] }); }
+  function table(id, head, rows) {
+    var t = $(id);
+    t.replaceChildren(el('tr', null, head.map(function (h) { return el('th', { text: h }); })));
+    rows.forEach(function (r) { t.appendChild(r); });
+    if (!rows.length) { t.appendChild(el('tr', null, [el('td', { className: 'jl-muted', text: 'Rien à afficher.', attrs: { colspan: String(head.length) } })])); }
+  }
+  function row(cells, onClick) {
+    return el('tr', { className: onClick ? 'jl-click' : '', on: onClick ? { click: onClick } : {} },
+      cells.map(function (c) { return el('td', null, [typeof c === 'string' ? c : c]); }));
+  }
+  function link(text, fn) { return el('button', { type: 'button', className: 'jl-link', text: text, on: { click: fn } }); }
+  function api(method, path, body) {
+    var opts = { type: method, url: ApiClient.getUrl('JellyLinks/admin/' + path) };
+    if (body !== undefined) { opts.data = JSON.stringify(body); opts.contentType = 'application/json'; }
+    return ApiClient.ajax(opts).then(function (r) {
+      return r && typeof r.json === 'function' ? (r.status === 204 ? null : r.json()) : r;
+    }, function (r) {
+      if (r && typeof r.json === 'function') { return r.json().then(function (j) { throw j; }, function () { throw [String(r.status)]; }); }
+      throw ['Serveur injoignable.'];
+    });
+  }
+  function query(params) {
+    return Object.keys(params).filter(function (k) { return params[k] !== '' && params[k] != null; })
+      .map(function (k) { return k + '=' + encodeURIComponent(params[k]); }).join('&');
+  }
+  function fillUsers(select) {
+    var keep = select.value;
+    select.replaceChildren(select.options[0]);
+    users.forEach(function (u) { select.appendChild(el('option', { value: u.Id, text: u.Name })); });
+    select.value = keep;
+  }
+  function copy(text) {
+    if (navigator.clipboard && window.isSecureContext) { return navigator.clipboard.writeText(text).then(function () { return true; }, function () { return false; }); }
+    var ta = el('textarea', { value: text, attrs: { style: 'position:fixed;opacity:0' } });
+    document.body.appendChild(ta); ta.select();
+    var ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    ta.remove();
+    return Promise.resolve(ok);
+  }
+
+  // ---- Vue d'ensemble --------------------------------------------------------
+  function chart(days, names) {
+    var byDay = {}, userIds = [];
+    days.forEach(function (d) {
+      (byDay[d.Day] = byDay[d.Day] || {})[d.UserId] = d.Bytes;
+      if (userIds.indexOf(d.UserId) < 0) { userIds.push(d.UserId); }
+    });
+    var today = Math.floor(Date.now() / 86400000), first = today - 29, max = 1;
+    for (var d = first; d <= today; d++) {
+      var sum = 0; userIds.forEach(function (u) { sum += (byDay[d] || {})[u] || 0; }); max = Math.max(max, sum);
+    }
+    var NS = 'http://www.w3.org/2000/svg', W = 600, H = 160, bw = W / 30;
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + (H + 16));
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', 'Volume servi par jour sur 30 jours, empilé par utilisateur');
+    for (var i = 0; i < 30; i++) {
+      var day = first + i, y = H;
+      userIds.forEach(function (u, k) {
+        var v = (byDay[day] || {})[u] || 0;
+        if (!v) { return; }
+        var h = Math.max(1, (v / max) * H);
+        y -= h;
+        var r = document.createElementNS(NS, 'rect');
+        r.setAttribute('x', String(i * bw + 1)); r.setAttribute('y', String(y));
+        r.setAttribute('width', String(bw - 2)); r.setAttribute('height', String(h));
+        r.setAttribute('fill', PALETTE[k % PALETTE.length]);
+        var tip = document.createElementNS(NS, 'title');
+        tip.textContent = (names[u] || u) + ' · ' + new Date(day * 86400000).toLocaleDateString(FR) + ' · ' + bytes(v);
+        r.appendChild(tip);
+        svg.appendChild(r);
+      });
+    }
+    var legend = el('div', { className: 'jl-legend jl-muted' }, userIds.map(function (u, k) {
+      return el('span', null, [el('i', { attrs: { style: 'background:' + PALETTE[k % PALETTE.length] } }), names[u] || u]);
+    }));
+    $('jl-chart').replaceChildren(svg, legend, el('div', { className: 'jl-muted', text: 'Échelle : ' + bytes(max) + ' au plus haut.' }));
+  }
+
+  function loadOverview() {
+    return api('GET', 'overview').then(function (o) {
+      var s = o.Stats;
+      function kpi(label, value, cls) { return el('div', { className: 'jl-kpi' }, [el('span', { className: 'jl-muted', text: label }), el('b', { className: cls || '', text: value })]); }
+      var review = s.FlaggedBatches + ' ⚠️ · ' + s.BlockedBatches + ' bloqué' + (s.BlockedBatches > 1 ? 's' : '');
+      $('jl-kpis').replaceChildren(
+        kpi('Lots actifs', String(s.ActiveBatches)),
+        kpi('Servi (7 j)', bytes(s.ServedBytes7d)),
+        kpi('Téléchargements terminés (7 j)', String(s.CompletedFiles7d)),
+        kpi('À examiner', review, s.FlaggedBatches + s.BlockedBatches ? 'jl-warn' : ''));
+      chart(o.Days, o.UserNames);
+      table('jl-top-titles', ['Titre', 'Volume'], o.TopTitles.map(function (t) { return row([t.Name, bytes(t.Bytes)]); }));
+      table('jl-top-users', ['Utilisateur', 'Volume'], o.TopUsers.map(function (t) { return row([t.Name, bytes(t.Bytes)]); }));
+    });
+  }
+
+  // ---- Lots -----------------------------------------------------------------
+  var openBatch = null;
+  function loadBatches() {
+    return api('GET', 'batches?' + query({ q: $('jl-b-q').value.trim(), state: $('jl-b-state').value, user: $('jl-b-user').value, days: $('jl-b-days').value }))
+      .then(function (list) {
+        table('jl-batches', ['Lot', 'Utilisateur', 'Créé', 'Avancement', 'Adresses', 'État'], list.map(function (x) {
+          var b = x.Batch;
+          return row([
+            el('span', null, [b.Label.split(' · ')[0], el('div', { className: 'jl-muted', text: b.FileCount + ' fichier' + (b.FileCount > 1 ? 's' : '') + ' · ' + bytes(b.TotalBytes) })]),
+            x.UserName, when(b.CreatedAt),
+            el('span', { className: b.CompleteCount === b.FileCount ? 'jl-ok' : 'jl-warn', text: b.CompleteCount + '/' + b.FileCount }),
+            el('span', { className: b.DistinctIps > 1 ? 'jl-warn' : '', text: String(b.DistinctIps) + (b.DistinctIps > 1 ? ' ⚠️' : '') }),
+            badge(STATES, b.State)
+          ], function () { showBatch(b.Id); });
+        }));
+      });
+  }
+
+  function showBatch(id) {
+    openBatch = id;
+    return api('GET', 'batches/' + id).then(function (d) {
+      var b = d.Batch, msg = el('span', { className: 'jl-muted' });
+      var head = el('div', null, [el('b', { text: b.Label.split(' · ')[0] }), ' · ' + d.UserName + ' · ', badge(STATES, b.State),
+        b.BlockedReason ? el('span', { className: 'jl-bad', text: ' — ' + b.BlockedReason }) : null,
+        el('span', { className: 'jl-muted', text: ' · limite ' + (d.IpLimit > 0 ? d.IpLimit : '∞') + ' adresses' })]);
+      var acts = el('div', { className: 'jl-msg' });
+      function act(path, confirmText) {
+        return function () {
+          if (confirmText && !window.confirm(confirmText)) { return; }
+          api('POST', path).then(function () { return Promise.all([loadBatches(), showBatch(id)]); }, function (e) { msg.textContent = [].concat(e).join(' '); });
+        };
+      }
+      if (b.State === 'blocked') {
+        acts.appendChild(link('Débloquer', act('batches/' + id + '/unblock?raise=false')));
+        acts.appendChild(link('Débloquer + relever la limite pour ce lot', act('batches/' + id + '/unblock?raise=true')));
+      }
+      if (b.State === 'active' || b.State === 'blocked') { acts.appendChild(link('Révoquer', act('batches/' + id + '/revoke', 'Révoquer ce lot ? Ses liens cesseront de fonctionner.'))); }
+      if (b.State === 'active') {
+        acts.appendChild(link('Copier les liens', function () {
+          api('GET', 'batches/' + id + '/links').then(function (urls) {
+            return copy(urls.join('\n') + '\n').then(function (ok) { msg.textContent = ok ? urls.length + ' liens copiés.' : 'Copie impossible ici.'; });
+          });
+        }));
+      }
+      acts.appendChild(msg);
+      var sessions = el('table', { className: 'jl' });
+      sessions.appendChild(el('tr', null, ['Session', 'Fichier', 'Adresse', 'Client', 'Durée', 'Reçu', 'Statut'].map(function (h) { return el('th', { text: h }); })));
+      d.Sessions.forEach(function (s) {
+        sessions.appendChild(row([when(s.FirstAt), s.FileName, el('span', { className: s.NewIp && b.DistinctIps > 1 ? 'jl-warn' : '', text: (s.NewIp && b.DistinctIps > 1 ? '⚠️ ' : '') + s.Ip }),
+          s.UserAgent, duration(s.LastAt - s.FirstAt), bytes(s.CoveredBytes) + ' / ' + bytes(s.Size), badge(SESSION, s.Status)]));
+      });
+      var events = el('table', { className: 'jl' });
+      d.Events.forEach(function (e) { events.appendChild(row([when(e.At), KINDS[e.Kind] || e.Kind, e.Detail])); });
+      $('jl-batch').replaceChildren(el('div', { className: 'jl-panel' }, [head, acts, el('h3', { text: 'Sessions' }), sessions,
+        el('h3', { text: 'Événements' }), events]));
+    });
+  }
+
+  // ---- Activité -------------------------------------------------------------
+  function loadActivity() {
+    return api('GET', 'activity?' + query({ q: $('jl-a-q').value.trim(), kind: $('jl-a-kind').value, user: $('jl-a-user').value, days: $('jl-a-days').value }))
+      .then(function (list) {
+        table('jl-activity', ['Quand', 'Quoi', 'Utilisateur', 'Lot', 'Détail'], list.map(function (e) {
+          return row([when(e.At), KINDS[e.Kind] || e.Kind, e.UserName, e.BatchLabel ? e.BatchLabel.split(' · ')[0] : '—', e.Detail],
+            e.BatchId ? function () { selectTab('batches'); showBatch(e.BatchId); } : null);
+        }));
+      });
+  }
+
+  // ---- Utilisateurs ---------------------------------------------------------
+  function quotaText(u) {
+    var q = u.Quota;
+    if (!q.Enabled) { return 'aucun'; }
+    return (q.VolumeBytes > 0 ? bytes(q.VolumeBytes) : 'illimité') + ' / ' + q.PeriodDays + ' j' + (q.MaxActiveBatches > 0 ? ' · ' + q.MaxActiveBatches + ' lots' : '') + (u.HasOverride ? ' (exception)' : ' (global)');
+  }
+  function loadUsers() {
+    return api('GET', 'users').then(function (list) {
+      users = list;
+      fillUsers($('jl-b-user')); fillUsers($('jl-a-user'));
+      table('jl-users', ['Utilisateur', 'Permission', 'Quota effectif', 'Période en cours', 'Lots actifs', 'Au-delà de la rétention'], list.map(function (u) {
+        return row([u.Name + (u.IsAdmin ? ' (admin)' : ''),
+          el('span', { className: u.CanDownload ? 'jl-ok' : 'jl-off', text: u.CanDownload ? 'téléchargement autorisé' : 'non autorisé' }),
+          quotaText(u), bytes(u.UsedBytes), String(u.ActiveBatches),
+          u.ArchivedBytes ? bytes(u.ArchivedBytes) + ' · ' + u.ArchivedCompleted + ' terminés' : '—'], function () { editUser(u); });
+      }));
+    });
+  }
+  function editUser(u) {
+    var q = u.Quota, msg = el('div', { className: 'jl-bad jl-msg' });
+    var vol = el('input', { type: 'number', min: '0', step: '1', value: String(u.HasOverride ? Math.round(q.VolumeBytes / 1e9) : 500) });
+    var days = el('input', { type: 'number', min: '1', max: '365', value: String(u.HasOverride ? q.PeriodDays : 7) });
+    var max = el('input', { type: 'number', min: '0', max: '1000', value: String(u.HasOverride ? q.MaxActiveBatches : 0) });
+    function field(label, input) { return el('label', { className: 'jl-filters' }, [el('span', { text: label }), input]); }
+    function done() { $('jl-user').replaceChildren(); return loadUsers(); }
+    $('jl-user').replaceChildren(el('div', { className: 'jl-panel' }, [
+      el('b', { text: 'Exception de quota — ' + u.Name }),
+      el('p', { className: 'jl-muted', text: 'La permission Jellyfin se règle dans le profil de l\'utilisateur (lecture seule ici). Une exception s\'applique même si le quota global est désactivé.' }),
+      field('Volume par période (Go, 0 = illimité)', vol), field('Période (jours)', days), field('Lots actifs max (0 = illimité)', max),
+      el('div', null, [
+        link('Enregistrer l\'exception', function () {
+          api('PUT', 'users/' + u.Id + '/quota', { VolumeBytes: Math.round(Number(vol.value) * 1e9), PeriodDays: Number(days.value), MaxActiveBatches: Number(max.value) })
+            .then(done, function (e) { msg.textContent = [].concat(e).join(' '); });
+        }),
+        u.HasOverride ? link('Revenir au quota global', function () { api('DELETE', 'users/' + u.Id + '/quota').then(done); }) : null,
+        link('Fermer', function () { $('jl-user').replaceChildren(); })
+      ]), msg]));
+  }
+
+  // ---- Réglages -------------------------------------------------------------
+  function loadSettings() {
+    return api('GET', 'settings').then(function (s) {
+      $('jl-s-validity').value = s.LinkValidityDays; $('jl-s-iplimit').value = s.IpLimit; $('jl-s-public').value = s.PublicBaseUrl;
+      $('jl-s-qon').checked = s.QuotaEnabled; $('jl-s-qvol').value = Math.round(s.QuotaVolumeBytes / 1e9);
+      $('jl-s-qdays').value = s.QuotaPeriodDays; $('jl-s-qmax').value = s.QuotaMaxActiveBatches; $('jl-s-ret').value = s.RetentionDays;
+      $('jl-s-hook').value = s.WebhookUrl; $('jl-s-fmt').value = s.WebhookFormat;
+      $('jl-s-n-blocked').checked = s.NotifyBatchBlocked; $('jl-s-n-ip').checked = s.NotifyNewIp;
+      $('jl-s-n-quota').checked = s.NotifyQuotaReached; $('jl-s-n-done').checked = s.NotifyBatchCompleted;
+    });
+  }
+  function readSettings() {
+    return {
+      LinkValidityDays: Number($('jl-s-validity').value), IpLimit: Number($('jl-s-iplimit').value), QuotaEnabled: $('jl-s-qon').checked,
+      QuotaVolumeBytes: Math.round(Number($('jl-s-qvol').value) * 1e9), QuotaPeriodDays: Number($('jl-s-qdays').value),
+      QuotaMaxActiveBatches: Number($('jl-s-qmax').value), RetentionDays: Number($('jl-s-ret').value), WebhookUrl: $('jl-s-hook').value.trim(),
+      WebhookFormat: $('jl-s-fmt').value, NotifyBatchBlocked: $('jl-s-n-blocked').checked, NotifyNewIp: $('jl-s-n-ip').checked,
+      NotifyQuotaReached: $('jl-s-n-quota').checked, NotifyBatchCompleted: $('jl-s-n-done').checked, PublicBaseUrl: $('jl-s-public').value.trim()
+    };
+  }
+
+  // ---- wiring ---------------------------------------------------------------
+  var loaders = { overview: loadOverview, batches: loadBatches, activity: loadActivity, users: loadUsers, settings: loadSettings };
+  function selectTab(name) {
+    Array.prototype.forEach.call(page.querySelectorAll('.jl-tab'), function (t) { t.classList.toggle('on', t.getAttribute('data-tab') === name); });
+    Array.prototype.forEach.call(page.querySelectorAll('.jl-pane'), function (p) { p.classList.toggle('on', p.getAttribute('data-pane') === name); });
+    return loaders[name]();
+  }
+  function debounce(fn) { var t; return function () { clearTimeout(t); t = setTimeout(fn, 250); }; }
+
+  var wired = false;
+  function wire() {
+    if (wired) { return; }
+    wired = true;
+    Array.prototype.forEach.call(page.querySelectorAll('.jl-tab'), function (t) { t.addEventListener('click', function () { selectTab(t.getAttribute('data-tab')); }); });
+    Object.keys(KINDS).forEach(function (k) { $('jl-a-kind').appendChild(el('option', { value: k, text: KINDS[k] })); });
+    $('jl-b-q').addEventListener('input', debounce(loadBatches));
+    ['jl-b-state', 'jl-b-user', 'jl-b-days'].forEach(function (id) { $(id).addEventListener('change', loadBatches); });
+    $('jl-a-q').addEventListener('input', debounce(loadActivity));
+    ['jl-a-kind', 'jl-a-user', 'jl-a-days'].forEach(function (id) { $(id).addEventListener('change', loadActivity); });
+    $('jl-settings').addEventListener('submit', function (e) {
+      e.preventDefault();
+      $('jl-s-errors').textContent = '';
+      api('POST', 'settings', readSettings()).then(function () { $('jl-s-errors').textContent = ''; $('jl-s-test-msg').textContent = 'Réglages enregistrés.'; },
+        function (errs) { $('jl-s-errors').replaceChildren.apply($('jl-s-errors'), [].concat(errs).map(function (m) { return el('div', { text: m }); })); });
+    });
+    $('jl-s-test').addEventListener('click', function () {
+      $('jl-s-test-msg').textContent = 'Envoi…';
+      api('POST', 'settings/test-webhook', { Url: $('jl-s-hook').value.trim(), Format: $('jl-s-fmt').value })
+        .then(function (r) { $('jl-s-test-msg').textContent = r.Message; }, function () { $('jl-s-test-msg').textContent = 'Échec.'; });
+    });
+    $('jl-revoke-all').addEventListener('click', function () {
+      var typed = window.prompt('Tous les liens existants cesseront de fonctionner et tous les lots ouverts seront révoqués.\nTape RÉVOQUER pour confirmer.');
+      if (typed !== 'RÉVOQUER') { $('jl-revoke-msg').textContent = 'Annulé.'; return; }
+      api('POST', 'revoke-all').then(function (r) { $('jl-revoke-msg').textContent = r.Revoked + ' lots révoqués, secret renouvelé.'; });
+    });
+  }
+
+  function checkInjector() {
+    ApiClient.getJSON(ApiClient.getUrl('Plugins')).then(function (plugins) {
+      var ok = plugins.some(function (p) { return p.Status === 'Active' && /javascript injector/i.test(p.Name); });
+      $('jl-dep').style.display = ok ? 'none' : '';
+    }, function () {});
+  }
+
+  function show() {
+    wire();
+    checkInjector();
+    loadUsers().then(function () { return selectTab('overview'); });
+  }
+  page.addEventListener('pageshow', show);
+  page.addEventListener('viewshow', show);
+})();
+</script>
+</div>
 </body>
 </html>
