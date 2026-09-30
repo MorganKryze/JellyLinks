@@ -51,3 +51,7 @@ jsinjector v:
 	mkdir -p "$dir"
 	curl -sfL -o "$dir/jsi.zip" "https://github.com/n00bcodr/Jellyfin-JavaScript-Injector/releases/download/4.0.0.0/Jellyfin.Plugin.JavaScriptInjector_${abi}.zip"
 	unzip -qo "$dir/jsi.zip" -d "$dir" && rm "$dir/jsi.zip"
+
+# Build the release ZIP locally (same script as the CI)
+package version:
+	scripts/package.sh {{version}}

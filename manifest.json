@@ -1,0 +1,12 @@
+[
+  {
+    "guid": "5b0f6e0c-2d4b-4f5e-9a57-3c1d8e7a4b21",
+    "name": "JellyLinks",
+    "owner": "MorganKryze",
+    "category": "General",
+    "overview": "Direct download links for the people you share your library with.",
+    "description": "Let your users fetch the original files of a movie, a season or a whole series in their download manager (JDownloader or any other) from signed, expiring links. See who downloaded what, when and from where; cap addresses and volume; revoke anything. Managed from the Jellyfin dashboard.",
+    "imageUrl": "https://raw.githubusercontent.com/MorganKryze/JellyLinks/main/assets/icon.png",
+    "versions": []
+  }
+]

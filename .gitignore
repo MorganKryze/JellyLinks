@@ -6,3 +6,4 @@ docker/media/
 docker/shows/
 *.user
 .DS_Store
+dist/
