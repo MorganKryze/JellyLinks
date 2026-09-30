@@ -135,28 +135,22 @@ public sealed class AdminController : ControllerBase
             return NotFound();
         }
 
-        if (b.State != BatchStates.Blocked)
-        {
-            return Conflict("not blocked");
-        }
-
-        if (!_store.Unblock(id))
-        {
-            return Conflict("not blocked");
-        }
-
-        var detail = "débloqué par l'administrateur";
+        int? limit = null;
         if (raise)
         {
             var effective = b.IpLimitOverride ?? _config().IpLimit;
             if (effective != 0)
             {
-                var distinct = _store.GetBatchRow(id, Now)?.DistinctIps ?? 0;
-                var limit = Math.Max(effective, distinct) + 1;
-                _store.SetIpLimitOverride(id, limit);
-                detail += $", limite relevée à {limit}";
+                limit = Math.Max(effective, _store.GetBatchRow(id, Now)?.DistinctIps ?? 0) + 1;
             }
         }
+
+        if (!_store.Unblock(id, limit))
+        {
+            return Conflict("not blocked");
+        }
+
+        var detail = "débloqué par l'administrateur" + (limit is int l ? $", limite relevée à {l}" : string.Empty);
 
         _ = _notifier.PublishAsync(new LinkEvent(EventKind.BatchUnblocked, b.UserId, _library.UserName(b.UserId), b.Label, id, detail));
         return NoContent();

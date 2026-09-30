@@ -208,4 +208,30 @@ public class LinkStoreTests
         Assert.Equal(BatchStates.Active, t.Store.GetBatch(id)!.State);
         Assert.Null(t.Store.GetBatch(id)!.BlockedReason);
     }
+
+    [Fact]
+    public void Block_does_not_overwrite_a_revoked_batch()
+    {
+        using var t = new TempStore();
+        var id = t.Store.CreateBatch(User, 0, 1000, "x", TempStore.AnySelection(Item), new[] { TempStore.Video(Item, "a.mkv", 10) });
+        Assert.True(t.Store.BlockIfActive(id, "4 adresses distinctes (limite 3)"));
+        Assert.False(t.Store.BlockIfActive(id, "again"));
+        t.Store.SetBatchState(id, BatchStates.Revoked, "révoqué");
+        Assert.False(t.Store.BlockIfActive(id, "late"));
+        Assert.Equal(BatchStates.Revoked, t.Store.GetBatch(id)!.State);
+    }
+
+    [Fact]
+    public void Unblock_can_raise_the_limit_in_the_same_step()
+    {
+        using var t = new TempStore();
+        var id = t.Store.CreateBatch(User, 0, 1000, "x", TempStore.AnySelection(Item), new[] { TempStore.Video(Item, "a.mkv", 10) });
+        t.Store.SetIpLimitOverride(id, 2);
+        t.Store.BlockIfActive(id, "r");
+        Assert.True(t.Store.Unblock(id, 4));
+        Assert.Equal((BatchStates.Active, (int?)4), (t.Store.GetBatch(id)!.State, t.Store.GetBatch(id)!.IpLimitOverride));
+        t.Store.BlockIfActive(id, "r");
+        Assert.True(t.Store.Unblock(id));
+        Assert.Equal(4, t.Store.GetBatch(id)!.IpLimitOverride);
+    }
 }

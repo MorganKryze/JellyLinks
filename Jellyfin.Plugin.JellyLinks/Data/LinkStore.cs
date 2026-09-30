@@ -185,9 +185,18 @@ public sealed partial class LinkStore
         Exec("UPDATE batches SET state = $s, blocked_reason = $r WHERE id = $id",
             ("$s", state), ("$r", (object?)reason ?? DBNull.Value), ("$id", id));
 
-    /// <summary>Compare-and-set: true only for the caller that turns a blocked batch back to active.</summary>
-    public bool Unblock(long id) =>
-        Exec("UPDATE batches SET state = 'active', blocked_reason = NULL WHERE id = $id AND state = 'blocked'", ("$id", id)) == 1;
+    /// <summary>Compare-and-set: blocks only a batch that is still active (a concurrent revoke or unblock wins).</summary>
+    public bool BlockIfActive(long id, string reason) =>
+        Exec("UPDATE batches SET state = 'blocked', blocked_reason = $r WHERE id = $id AND state = 'active'",
+            ("$r", reason), ("$id", id)) == 1;
+
+    /// <summary>Compare-and-set: turns a blocked batch back to active and, when given, sets its new address limit in the same statement.</summary>
+    public bool Unblock(long id, int? newLimit = null) =>
+        Exec("""
+            UPDATE batches SET state = 'active', blocked_reason = NULL,
+              ip_limit_override = CASE WHEN $l IS NULL THEN ip_limit_override ELSE $l END
+            WHERE id = $id AND state = 'blocked'
+            """, ("$l", (object?)newLimit ?? DBNull.Value), ("$id", id)) == 1;
 
     public void SetIpLimitOverride(long id, int? limit) =>
         Exec("UPDATE batches SET ip_limit_override = $l WHERE id = $id", ("$l", (object?)limit ?? DBNull.Value), ("$id", id));
