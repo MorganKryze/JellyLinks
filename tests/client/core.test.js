@@ -137,6 +137,11 @@ test('error messages', () => {
   assert.equal(JL.errorMessage(0), 'Serveur injoignable.');
 });
 
+test('session and gone messages', () => {
+  assert.equal(JL.errorMessage(401), 'Session expirée : reconnecte-toi puis réessaie.');
+  assert.equal(JL.errorMessage(410), 'Ce lot ou ce fichier n’existe plus.');
+});
+
 test('client scripts never use innerHTML', () => {
   const dir = path.join(__dirname, '../../Jellyfin.Plugin.JellyLinks/Client');
   for (const name of fs.readdirSync(dir).filter((n) => n.endsWith('.js'))) {

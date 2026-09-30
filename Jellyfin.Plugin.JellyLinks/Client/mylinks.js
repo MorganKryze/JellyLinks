@@ -69,7 +69,15 @@
         });
         return;
       }
-      if (a === 'revoke' && !window.confirm('Révoquer « ' + JL.labelTitle(b.Label) + ' » ? Ses liens cesseront de fonctionner.')) { return; }
+      if (a === 'revoke' && !b.confirmed) {
+        d.content.replaceChildren(
+          el('div', { className: 'jlMsg', text: 'Révoquer « ' + JL.labelTitle(b.Label) + ' » ? Ses liens cesseront de fonctionner.' }),
+          el('div', { className: 'jlTools' }, [
+            link('Révoquer', function () { act(a, Object.assign({}, b, { confirmed: true })); }),
+            link('Annuler', render)
+          ]));
+        return;
+      }
       if (busy) { return; }
       busy = true;
       JL.api('POST', 'batches/' + b.Id + '/' + a).then(function () {

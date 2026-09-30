@@ -11,7 +11,7 @@ build:
 # Run server and client tests
 test:
 	dotnet test
-	node --test tests/client/
+	TZ=UTC node --test tests/client/
 
 # Build, deploy to v10, and start
 v10: build

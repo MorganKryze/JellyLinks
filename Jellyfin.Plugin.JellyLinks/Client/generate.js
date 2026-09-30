@@ -5,9 +5,9 @@
 
   function link(text, fn) { return el('button', { type: 'button', className: 'jlLink', text: text, on: { click: fn } }); }
   function row(label, right, extra) { return el('div', { className: 'jlRow' + (extra ? ' ' + extra : '') }, [typeof label === 'string' ? el('span', { text: label }) : label, right]); }
-  function check(state, fn) {
+  function check(state, fn, label) {
     var glyph = state === 'all' ? '☑' : (state === 'some' ? '◩' : '☐');
-    return el('button', { type: 'button', className: 'jlCheck', text: glyph, attrs: { 'aria-pressed': String(state === 'all') }, on: { click: fn } });
+    return el('button', { type: 'button', className: 'jlCheck', text: glyph, attrs: { 'aria-pressed': String(state === 'all'), 'aria-label': label }, on: { click: fn } });
   }
   function action(text, primary, disabled, fn) {
     return el('button', { type: 'button', className: 'raised emby-button ' + (primary ? 'button-submit' : 'button-cancel'), disabled: disabled, on: { click: fn } }, [el('span', { text: text })]);
@@ -47,7 +47,7 @@
     }
 
     function subtitles() {
-      return el('span', null, [check(s.subs ? 'all' : 'none', function () { s.subs = !s.subs; load(); }), s.subs ? 'inclus' : 'exclus']);
+      return el('span', null, [check(s.subs ? 'all' : 'none', function () { s.subs = !s.subs; load(); }, 'Sous-titres externes'), s.subs ? 'inclus' : 'exclus']);
     }
 
     function groupRows(g) {
@@ -55,14 +55,14 @@
       var picked = g.units.filter(function (u) { return !s.excluded.has(u.id); });
       var bytes = picked.reduce(function (n, u) { return n + u.bytes; }, 0);
       var head = el('span', null, [
-        check(state, function () { JL.toggleGroup(g, s.excluded); render(); }),
+        check(state, function () { JL.toggleGroup(g, s.excluded); render(); }, g.label),
         link((s.open[g.key] ? '▾ ' : '▸ ') + g.label, function () { s.open[g.key] = !s.open[g.key]; render(); })
       ]);
       var rows = [row(head, el('span', { className: 'jlMuted', text: picked.length + '/' + g.units.length + ' · ' + JL.formatBytes(bytes) }))];
       if (s.open[g.key]) {
         g.units.forEach(function (u) {
           var label = el('span', null, [
-            check(s.excluded.has(u.id) ? 'none' : 'all', function () { JL.toggleUnit(u.id, s.excluded); render(); }),
+            check(s.excluded.has(u.id) ? 'none' : 'all', function () { JL.toggleUnit(u.id, s.excluded); render(); }, JL.unitLabel(u)),
             JL.unitLabel(u),
             u.played ? el('span', { className: 'jlMuted', text: ' · vu' }) : null
           ]);

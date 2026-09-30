@@ -150,6 +150,8 @@
   JL.errorMessage = function (status) {
     if (status === 429) { return 'Quota atteint : impossible de créer un lot pour le moment.'; }
     if (status === 400) { return 'Rien à lier : sélection vide ou téléchargement non autorisé.'; }
+    if (status === 401) { return 'Session expirée : reconnecte-toi puis réessaie.'; }
+    if (status === 410) { return 'Ce lot ou ce fichier n’existe plus.'; }
     if (status === 403) { return 'Action refusée.'; }
     if (status === 404) { return 'Lot introuvable.'; }
     return status ? 'Erreur du serveur (' + status + ').' : 'Serveur injoignable.';
@@ -217,37 +219,62 @@
     document.head.appendChild(JL.el('style', { id: 'jlStyle', text: STYLE }));
   };
 
-  /** A native-looking Jellyfin dialog (legacy dialog CSS exists on 10.11 and 12). Escape, backdrop and ✕ close it. */
+  var stack = [];
+
+  /** A native-looking Jellyfin dialog (legacy dialog CSS exists on 10.11 and 12). Escape (topmost only), backdrop, ✕, back and route changes close it. */
   JL.openDialog = function (title) {
     JL.injectStyle();
+    var before = document.activeElement;
     var backdrop = JL.el('div', { className: 'dialogBackdrop dialogBackdropOpened' });
     var content = JL.el('div', { className: 'dialogContentInner dialog-content-centered padded-left padded-right jlBody' });
     var footer = JL.el('div', { className: 'formDialogFooter formDialogFooter-flex jlFooter' });
-    var container;
-    // Escape is ours: stop it so Jellyfin does not also treat it as "back". Browser back or a route change closes the dialog too.
-    var onKey = function (e) { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    var container, dialog, downOnBackdrop = false;
+    function focusables() {
+      return Array.prototype.filter.call(dialog.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'),
+        function (n) { return !n.disabled && n.offsetParent !== null; });
+    }
+    var onKey = function (e) {
+      if (stack[stack.length - 1] !== close) { return; } // only the topmost dialog reacts
+      if (e.key === 'Escape') { e.stopPropagation(); close(); return; }
+      if (e.key === 'Tab') {
+        var f = focusables();
+        if (!f.length) { return; }
+        var first = f[0], last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
     var onNav = function () { close(); };
     var close = function () {
+      var i = stack.indexOf(close);
+      if (i < 0) { return; }
+      stack.splice(i, 1);
       document.removeEventListener('keydown', onKey, true);
       window.removeEventListener('popstate', onNav);
       window.removeEventListener('hashchange', onNav);
       backdrop.remove();
       container.remove();
+      if (before && typeof before.focus === 'function') { before.focus(); }
     };
-    var dialog = JL.el('div', { className: 'focuscontainer dialog formDialog opened centeredDialog jlDialog', attrs: { role: 'dialog', 'aria-modal': 'true' } }, [
+    dialog = JL.el('div', { className: 'focuscontainer dialog formDialog opened centeredDialog jlDialog', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': title } }, [
       JL.el('div', { className: 'formDialogHeader' }, [
-        JL.el('button', { type: 'button', className: 'btnCancel autoSize paper-icon-button-light', title: 'Fermer', on: { click: close } }, [JL.icon('close')]),
+        JL.el('button', { type: 'button', className: 'btnCancel autoSize paper-icon-button-light', title: 'Fermer', attrs: { 'aria-label': 'Fermer' }, on: { click: close } }, [JL.icon('close')]),
         JL.el('h3', { className: 'formDialogHeaderTitle', text: title })
       ]),
       JL.el('div', { className: 'formDialogContent smoothScrollY' }, [content]),
       footer
     ]);
-    container = JL.el('div', { className: 'dialogContainer', on: { click: function (e) { if (e.target === container) { close(); } } } }, [dialog]);
+    container = JL.el('div', { className: 'dialogContainer', on: {
+      mousedown: function (e) { downOnBackdrop = e.target === container; },
+      click: function (e) { if (e.target === container && downOnBackdrop) { close(); } downOnBackdrop = false; }
+    } }, [dialog]);
+    stack.push(close);
     document.addEventListener('keydown', onKey, true);
     window.addEventListener('popstate', onNav);
     window.addEventListener('hashchange', onNav);
     document.body.appendChild(backdrop);
     document.body.appendChild(container);
+    setTimeout(function () { var f = focusables(); if (f.length) { f[0].focus(); } }, 0);
     return { content: content, footer: footer, close: close };
   };
 
@@ -255,6 +282,7 @@
     var ta = JL.el('textarea', { value: text, className: 'jlClip', attrs: { readonly: '' } });
     document.body.appendChild(ta);
     ta.select();
+    ta.setSelectionRange(0, text.length); // iOS selects nothing with select() alone
     var ok = false;
     try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
     ta.remove();
