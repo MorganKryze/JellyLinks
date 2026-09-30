@@ -12,11 +12,13 @@ JellyLinks never downloads anything itself and never transcodes: it serves your 
 
 ## Features
 
-- **Links button** on movie, series, season and episode pages, in the "…" menus and in multi-selection.
+The interface is in French.
+
+- **Links button** (« Liens de téléchargement », link icon) on movie, series, season and episode pages, in the "…" menus and in multi-selection.
 - **Pick what you need**: default version or all versions, external subtitles, whole seasons or single
   episodes, "unwatched only". Totals update as you tick.
 - **Copy the links or download a `.txt`**, one URL per line — straight into your download manager.
-- **My links**: each batch as a card with its progress; copy again, revoke, or regenerate an expired one.
+- **My links** (« Mes liens »): each batch as a card with its progress; copy again, revoke, or regenerate an expired one.
 - **Signed, expiring links** (7 days by default). A renamed file keeps its link working; a deleted one answers `410`.
 - **Resumable downloads**: byte ranges, `ETag` and `If-Range`, parallel chunks.
 - **Sharing guard**: a batch used from more distinct addresses than allowed (3 by default) is blocked
@@ -35,7 +37,7 @@ JellyLinks never downloads anything itself and never transcodes: it serves your 
 
 1. **Jellyfin 10.11.10+ or 12.0.**
 2. **[JavaScript Injector](https://github.com/n00bcodr/Jellyfin-JavaScript-Injector) 4.0+** — it delivers
-   the Links button and the My links page to the web UI. JellyLinks registers its script by itself; there
+   the Links button and the My links page (« Mes liens ») to the web UI. JellyLinks registers its script by itself; there
    is nothing to paste. Add the repository matching your server in **Dashboard → Plugins → Repositories**:
 
    ```plain
@@ -63,7 +65,7 @@ permission is re-checked on every request.
 - Declare your proxies in **Dashboard → Networking → Known proxies**, otherwise every download seems to
   come from the proxy and the address limit means nothing. Check an entry of the activity log after a
   connection from outside: it must show the client's public address.
-- Set **Settings → Public address of the links** (e.g. `https://jellyfin.example`) if the address
+- Set **Settings → Public address of the links** (Réglages → « Adresse publique des liens ») (e.g. `https://jellyfin.example`) if the address
   Jellyfin sees is not the one your users reach.
 
 ## Admin panel
@@ -74,18 +76,18 @@ permission is re-checked on every request.
 
 | Tab | What you do there |
 | --- | --- |
-| Overview | active batches, volume served and downloads completed (7 days), items to review; daily volume per user (30 days), top titles and users |
-| Batches | search and filter; open a batch to see each session (time, file, full address, client, duration, received / size, status); unblock, unblock and raise its limit, revoke, copy its links |
-| Activity | the log of sessions and events, searchable and filterable |
-| Users | permission, effective quota, usage, active batches, archived totals; set or remove a quota exception |
-| Settings | link validity, address limit, global quota, retention, public address, webhook (with a test button), and **Revoke everything** (new signing key: every link ever issued stops working) |
+| Overview (Vue d'ensemble) | active batches, volume served and downloads completed (7 days), items to review; daily volume per user (30 days), top titles and users |
+| Batches (Lots) | search and filter; open a batch to see each session (time, file, full address, client, duration, received / size, status); unblock, unblock and raise its limit, revoke, copy its links |
+| Activity (Activité) | the log of sessions and events, searchable and filterable |
+| Users (Utilisateurs) | permission, effective quota, usage, active batches, archived totals; set or remove a quota exception |
+| Settings (Réglages) | link validity, address limit, global quota, retention, public address, webhook (with a test button), and **Revoke everything** (« Tout révoquer »; new signing key: every link ever issued stops working) |
 
 ## Troubleshooting
 
 | Symptom | Cause |
 | --- | --- |
 | No Links button | JavaScript Injector missing or inactive (the panel shows a warning), or the user lacks "Allow media downloading" |
-| Every download blocked after three tries | the proxy is not in Known proxies: all requests share its address |
+| The address limit never triggers; every session shows the same address | the proxy is not in Known proxies: Jellyfin sees the proxy's address instead of the client's |
 | `403` on a link | the batch was revoked or blocked, or the user lost the permission or access to the library |
 | `410` on a link | the batch expired, or the file is gone (a rename is followed; a deletion is not) |
 | `429` on a link | the user's quota is reached for the current window |
