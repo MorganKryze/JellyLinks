@@ -22,7 +22,7 @@ jobs:
       - name: Server tests
         run: dotnet test --configuration Release
       - name: Client tests
-        run: TZ=UTC node --test tests/client/
+        run: TZ=UTC node --test tests/client/*.test.js
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
