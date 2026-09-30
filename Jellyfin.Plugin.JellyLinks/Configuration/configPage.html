@@ -40,6 +40,7 @@
     <button type="button" class="jl-tab" data-tab="users">Utilisateurs</button>
     <button type="button" class="jl-tab" data-tab="settings">Réglages</button>
   </div>
+  <div id="jl-error" class="jl-bad jl-msg" role="alert"></div>
 
   <div class="jl-pane on" data-pane="overview">
     <div class="jl-kpis" id="jl-kpis"></div>
@@ -153,9 +154,26 @@
     if (!rows.length) { t.appendChild(el('tr', null, [el('td', { className: 'jl-muted', text: 'Rien à afficher.', attrs: { colspan: String(head.length) } })])); }
   }
   function row(cells, onClick) {
-    return el('tr', { className: onClick ? 'jl-click' : '', on: onClick ? { click: onClick } : {} },
-      cells.map(function (c) { return el('td', null, [typeof c === 'string' ? c : c]); }));
+    var on = {}, attrs = {};
+    if (onClick) {
+      on.click = onClick;
+      on.keydown = function (e) {
+        if (e.target !== e.currentTarget) { return; }
+        if (e.key === 'Enter' || e.key === ' ') { if (e.key === ' ') { e.preventDefault(); } onClick(); }
+      };
+      attrs = { tabindex: '0', role: 'button' };
+    }
+    return el('tr', { className: onClick ? 'jl-click' : '', on: on, attrs: attrs },
+      cells.map(function (c) { return el('td', null, [c]); }));
   }
+  // Errors come back as an array of French messages (validation) or anything else (generic).
+  function msgs(e) {
+    return Array.isArray(e) && e.length && e.every(function (m) { return typeof m === 'string'; }) ? e : ['Erreur du serveur.'];
+  }
+  function msgOf(e) { return msgs(e).join(' '); }
+  function fail(e) { $('jl-error').textContent = msgOf(e); }
+  function ok(v) { $('jl-error').textContent = ''; return v; }
+  function run(p) { return p.then(ok, fail); }
   function link(text, fn) { return el('button', { type: 'button', className: 'jl-link', text: text, on: { click: fn } }); }
   function api(method, path, body) {
     var opts = { type: method, url: ApiClient.getUrl('JellyLinks/admin/' + path) };
@@ -163,7 +181,7 @@
     return ApiClient.ajax(opts).then(function (r) {
       return r && typeof r.json === 'function' ? (r.status === 204 ? null : r.json()) : r;
     }, function (r) {
-      if (r && typeof r.json === 'function') { return r.json().then(function (j) { throw j; }, function () { throw [String(r.status)]; }); }
+      if (r && typeof r.json === 'function') { return r.json().then(function (j) { throw j; }, function () { throw ['Erreur du serveur (' + r.status + ').']; }); }
       throw ['Serveur injoignable.'];
     });
   }
@@ -255,7 +273,7 @@
             el('span', { className: b.CompleteCount === b.FileCount ? 'jl-ok' : 'jl-warn', text: b.CompleteCount + '/' + b.FileCount }),
             el('span', { className: b.DistinctIps > 1 ? 'jl-warn' : '', text: String(b.DistinctIps) + (b.DistinctIps > 1 ? ' ⚠️' : '') }),
             badge(STATES, b.State)
-          ], function () { showBatch(b.Id); });
+          ], function () { run(showBatch(b.Id)); });
         }));
       });
   }
@@ -271,7 +289,7 @@
       function act(path, confirmText) {
         return function () {
           if (confirmText && !window.confirm(confirmText)) { return; }
-          api('POST', path).then(function () { return Promise.all([loadBatches(), showBatch(id)]); }, function (e) { msg.textContent = [].concat(e).join(' '); });
+          api('POST', path).then(function () { return run(Promise.all([loadBatches(), showBatch(id)])); }, function (e) { msg.textContent = msgOf(e); });
         };
       }
       if (b.State === 'blocked') {
@@ -282,8 +300,8 @@
       if (b.State === 'active') {
         acts.appendChild(link('Copier les liens', function () {
           api('GET', 'batches/' + id + '/links').then(function (urls) {
-            return copy(urls.join('\n') + '\n').then(function (ok) { msg.textContent = ok ? urls.length + ' liens copiés.' : 'Copie impossible ici.'; });
-          });
+            return copy(urls.join('\n') + '\n').then(function (copied) { msg.textContent = copied ? urls.length + ' liens copiés.' : 'Copie impossible ici.'; });
+          }).then(null, function (e) { msg.textContent = msgOf(e); });
         }));
       }
       acts.appendChild(msg);
@@ -306,7 +324,7 @@
       .then(function (list) {
         table('jl-activity', ['Quand', 'Quoi', 'Utilisateur', 'Lot', 'Détail'], list.map(function (e) {
           return row([when(e.At), KINDS[e.Kind] || e.Kind, e.UserName, e.BatchLabel ? e.BatchLabel.split(' · ')[0] : '—', e.Detail],
-            e.BatchId ? function () { selectTab('batches'); showBatch(e.BatchId); } : null);
+            e.BatchId ? function () { selectTab('batches'); run(showBatch(e.BatchId)); } : null);
         }));
       });
   }
@@ -335,7 +353,7 @@
     var days = el('input', { type: 'number', min: '1', max: '365', value: String(u.HasOverride ? q.PeriodDays : 7) });
     var max = el('input', { type: 'number', min: '0', max: '1000', value: String(u.HasOverride ? q.MaxActiveBatches : 0) });
     function field(label, input) { return el('label', { className: 'jl-filters' }, [el('span', { text: label }), input]); }
-    function done() { $('jl-user').replaceChildren(); return loadUsers(); }
+    function done() { $('jl-user').replaceChildren(); return run(loadUsers()); }
     $('jl-user').replaceChildren(el('div', { className: 'jl-panel' }, [
       el('b', { text: 'Exception de quota — ' + u.Name }),
       el('p', { className: 'jl-muted', text: 'La permission Jellyfin se règle dans le profil de l\'utilisateur (lecture seule ici). Une exception s\'applique même si le quota global est désactivé.' }),
@@ -343,9 +361,9 @@
       el('div', null, [
         link('Enregistrer l\'exception', function () {
           api('PUT', 'users/' + u.Id + '/quota', { VolumeBytes: Math.round(Number(vol.value) * 1e9), PeriodDays: Number(days.value), MaxActiveBatches: Number(max.value) })
-            .then(done, function (e) { msg.textContent = [].concat(e).join(' '); });
+            .then(done, function (e) { msg.textContent = msgOf(e); });
         }),
-        u.HasOverride ? link('Revenir au quota global', function () { api('DELETE', 'users/' + u.Id + '/quota').then(done); }) : null,
+        u.HasOverride ? link('Revenir au quota global', function () { api('DELETE', 'users/' + u.Id + '/quota').then(done, function (e) { msg.textContent = msgOf(e); }); }) : null,
         link('Fermer', function () { $('jl-user').replaceChildren(); })
       ]), msg]));
   }
@@ -376,7 +394,7 @@
   function selectTab(name) {
     Array.prototype.forEach.call(page.querySelectorAll('.jl-tab'), function (t) { t.classList.toggle('on', t.getAttribute('data-tab') === name); });
     Array.prototype.forEach.call(page.querySelectorAll('.jl-pane'), function (p) { p.classList.toggle('on', p.getAttribute('data-pane') === name); });
-    return loaders[name]();
+    return run(loaders[name]());
   }
   function debounce(fn) { var t; return function () { clearTimeout(t); t = setTimeout(fn, 250); }; }
 
@@ -386,15 +404,17 @@
     wired = true;
     Array.prototype.forEach.call(page.querySelectorAll('.jl-tab'), function (t) { t.addEventListener('click', function () { selectTab(t.getAttribute('data-tab')); }); });
     Object.keys(KINDS).forEach(function (k) { $('jl-a-kind').appendChild(el('option', { value: k, text: KINDS[k] })); });
-    $('jl-b-q').addEventListener('input', debounce(loadBatches));
-    ['jl-b-state', 'jl-b-user', 'jl-b-days'].forEach(function (id) { $(id).addEventListener('change', loadBatches); });
-    $('jl-a-q').addEventListener('input', debounce(loadActivity));
-    ['jl-a-kind', 'jl-a-user', 'jl-a-days'].forEach(function (id) { $(id).addEventListener('change', loadActivity); });
+    function batches() { return run(loadBatches()); }
+    function activity() { return run(loadActivity()); }
+    $('jl-b-q').addEventListener('input', debounce(batches));
+    ['jl-b-state', 'jl-b-user', 'jl-b-days'].forEach(function (id) { $(id).addEventListener('change', batches); });
+    $('jl-a-q').addEventListener('input', debounce(activity));
+    ['jl-a-kind', 'jl-a-user', 'jl-a-days'].forEach(function (id) { $(id).addEventListener('change', activity); });
     $('jl-settings').addEventListener('submit', function (e) {
       e.preventDefault();
       $('jl-s-errors').textContent = '';
       api('POST', 'settings', readSettings()).then(function () { $('jl-s-errors').textContent = ''; $('jl-s-test-msg').textContent = 'Réglages enregistrés.'; },
-        function (errs) { $('jl-s-errors').replaceChildren.apply($('jl-s-errors'), [].concat(errs).map(function (m) { return el('div', { text: m }); })); });
+        function (errs) { $('jl-s-errors').replaceChildren.apply($('jl-s-errors'), msgs(errs).map(function (m) { return el('div', { text: m }); })); });
     });
     $('jl-s-test').addEventListener('click', function () {
       $('jl-s-test-msg').textContent = 'Envoi…';
@@ -404,7 +424,10 @@
     $('jl-revoke-all').addEventListener('click', function () {
       var typed = window.prompt('Tous les liens existants cesseront de fonctionner et tous les lots ouverts seront révoqués.\nTape RÉVOQUER pour confirmer.');
       if (typed !== 'RÉVOQUER') { $('jl-revoke-msg').textContent = 'Annulé.'; return; }
-      api('POST', 'revoke-all').then(function (r) { $('jl-revoke-msg').textContent = r.Revoked + ' lots révoqués, secret renouvelé.'; });
+      api('POST', 'revoke-all').then(function (r) {
+        $('jl-revoke-msg').textContent = r.Revoked + ' lots révoqués, secret renouvelé.';
+        return selectTab(page.querySelector('.jl-tab.on').getAttribute('data-tab'));
+      }, function (e) { $('jl-revoke-msg').textContent = msgOf(e); });
     });
   }
 
@@ -415,10 +438,15 @@
     }, function () {});
   }
 
+  // pageshow and viewshow both fire on each open (10.11 and 12): ignore the second while the first loads.
+  var loading = false;
   function show() {
     wire();
+    if (loading) { return; }
+    loading = true;
     checkInjector();
-    loadUsers().then(function () { return selectTab('overview'); });
+    loadUsers().then(function () { return selectTab('overview'); }).then(null, fail)
+      .then(function () { loading = false; });
   }
   page.addEventListener('pageshow', show);
   page.addEventListener('viewshow', show);
