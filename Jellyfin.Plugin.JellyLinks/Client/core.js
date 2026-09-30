@@ -239,6 +239,7 @@
       if (e.key === 'Tab') {
         var f = focusables();
         if (!f.length) { return; }
+        if (!dialog.contains(document.activeElement)) { e.preventDefault(); f[0].focus(); return; } // content was replaced: focus fell to the page
         var first = f[0], last = f[f.length - 1];
         if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
         else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
@@ -279,6 +280,7 @@
   };
 
   function legacyCopy(text) {
+    var prev = document.activeElement;
     var ta = JL.el('textarea', { value: text, className: 'jlClip', attrs: { readonly: '' } });
     document.body.appendChild(ta);
     ta.select();
@@ -286,6 +288,7 @@
     var ok = false;
     try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
     ta.remove();
+    if (prev && prev.isConnected && typeof prev.focus === 'function') { prev.focus(); }
     return ok;
   }
 

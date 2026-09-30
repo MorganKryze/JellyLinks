@@ -141,9 +141,12 @@
     }
 
     function manual(b, text) {
+      var ta = el('textarea', { className: 'jlManual', value: JL.linksText(b), attrs: { readonly: '' } });
       d.content.replaceChildren(
         el('div', { className: 'jlMsg', text: text || 'Copie automatique impossible ici : sélectionne le texte ci-dessous et copie-le.' }),
-        el('textarea', { className: 'jlManual', value: JL.linksText(b), attrs: { readonly: '' } }));
+        ta);
+      ta.focus();
+      ta.select();
     }
 
     load();

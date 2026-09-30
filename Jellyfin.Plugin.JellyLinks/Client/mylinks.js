@@ -62,20 +62,25 @@
       if (a === 'copy') {
         JL.copyText(JL.linksText(b)).then(function (ok) {
           if (ok) { notice = 'Liens de « ' + JL.labelTitle(b.Label) + ' » copiés.'; render(); return; }
+          var ta = el('textarea', { className: 'jlManual', value: JL.linksText(b), attrs: { readonly: '' } });
           d.content.replaceChildren(
             el('div', { className: 'jlMsg', text: 'Copie automatique impossible ici : sélectionne le texte ci-dessous et copie-le.' }),
-            el('textarea', { className: 'jlManual', value: JL.linksText(b), attrs: { readonly: '' } }),
+            ta,
             link('◂ retour', render));
+          ta.focus();
+          ta.select();
         });
         return;
       }
       if (a === 'revoke' && !b.confirmed) {
+        var cancel = link('Annuler', render);
         d.content.replaceChildren(
           el('div', { className: 'jlMsg', text: 'Révoquer « ' + JL.labelTitle(b.Label) + ' » ? Ses liens cesseront de fonctionner.' }),
           el('div', { className: 'jlTools' }, [
             link('Révoquer', function () { act(a, Object.assign({}, b, { confirmed: true })); }),
-            link('Annuler', render)
+            cancel
           ]));
+        cancel.focus();
         return;
       }
       if (busy) { return; }
