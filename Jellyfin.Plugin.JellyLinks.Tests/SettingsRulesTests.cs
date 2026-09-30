@@ -44,4 +44,12 @@ public class SettingsRulesTests
         Assert.Equal("https://jellyfin.example", c.PublicBaseUrl);
         Assert.Equal("keep-me", c.SigningSecret);
     }
+
+    [Fact]
+    public void Null_text_settings_are_errors_not_exceptions()
+    {
+        Assert.NotEmpty(SettingsRules.Validate(Valid() with { WebhookUrl = null! }));
+        Assert.NotEmpty(SettingsRules.Validate(Valid() with { PublicBaseUrl = null! }));
+        Assert.NotEmpty(SettingsRules.Validate(Valid() with { WebhookFormat = null! }));
+    }
 }

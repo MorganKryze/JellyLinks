@@ -10,7 +10,15 @@ public sealed class LinkSigner
     private const int TokenBytes = 8 + 8 + MacLength;
     private readonly byte[] _key;
 
-    public LinkSigner(byte[] key) => _key = key;
+    public LinkSigner(byte[] key)
+    {
+        if (key is null || key.Length < 32)
+        {
+            throw new ArgumentException("The signing key must be at least 32 bytes.", nameof(key));
+        }
+
+        _key = key;
+    }
 
     public string Sign(long linkId, long expiresUnix)
     {

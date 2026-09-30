@@ -185,6 +185,10 @@ public sealed partial class LinkStore
         Exec("UPDATE batches SET state = $s, blocked_reason = $r WHERE id = $id",
             ("$s", state), ("$r", (object?)reason ?? DBNull.Value), ("$id", id));
 
+    /// <summary>Compare-and-set: true only for the caller that turns a blocked batch back to active.</summary>
+    public bool Unblock(long id) =>
+        Exec("UPDATE batches SET state = 'active', blocked_reason = NULL WHERE id = $id AND state = 'blocked'", ("$id", id)) == 1;
+
     public void SetIpLimitOverride(long id, int? limit) =>
         Exec("UPDATE batches SET ip_limit_override = $l WHERE id = $id", ("$l", (object?)limit ?? DBNull.Value), ("$id", id));
 

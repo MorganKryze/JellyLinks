@@ -195,4 +195,17 @@ public class LinkStoreTests
         Assert.Equal("0-3", c3.Covered);
         Assert.Equal(string.Empty, a.Title);
     }
+
+    [Fact]
+    public void Unblock_only_flips_a_blocked_batch()
+    {
+        using var t = new TempStore();
+        var id = t.Store.CreateBatch(User, 0, 1000, "x", TempStore.AnySelection(Item), new[] { TempStore.Video(Item, "a.mkv", 10) });
+        Assert.False(t.Store.Unblock(id));
+        t.Store.SetBatchState(id, BatchStates.Blocked, "why");
+        Assert.True(t.Store.Unblock(id));
+        Assert.False(t.Store.Unblock(id));
+        Assert.Equal(BatchStates.Active, t.Store.GetBatch(id)!.State);
+        Assert.Null(t.Store.GetBatch(id)!.BlockedReason);
+    }
 }

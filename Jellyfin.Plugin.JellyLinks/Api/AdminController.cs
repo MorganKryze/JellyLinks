@@ -62,7 +62,7 @@ public sealed class AdminController : ControllerBase
 
     private Dictionary<Guid, string> Names() => _library.Users().ToDictionary(u => u.Id, u => u.Name);
 
-    private static string NameOf(Dictionary<Guid, string> names, Guid id) => names.TryGetValue(id, out var n) ? n : id.ToString("N");
+    private static string NameOf(Dictionary<Guid, string> names, Guid id) => names.TryGetValue(id, out var n) ? n : id == Guid.Empty ? "administrateur" : id.ToString("N");
 
     private IReadOnlyList<Guid>? UsersMatching(string? text, Dictionary<Guid, string> names) =>
         string.IsNullOrWhiteSpace(text) ? null
@@ -139,15 +139,24 @@ public sealed class AdminController : ControllerBase
             return Conflict("not blocked");
         }
 
+        if (!_store.Unblock(id))
+        {
+            return Conflict("not blocked");
+        }
+
         var detail = "débloqué par l'administrateur";
         if (raise)
         {
-            var limit = (b.IpLimitOverride ?? _config().IpLimit) + 1;
-            _store.SetIpLimitOverride(id, limit);
-            detail += $", limite relevée à {limit}";
+            var effective = b.IpLimitOverride ?? _config().IpLimit;
+            if (effective != 0)
+            {
+                var distinct = _store.GetBatchRow(id, Now)?.DistinctIps ?? 0;
+                var limit = Math.Max(effective, distinct) + 1;
+                _store.SetIpLimitOverride(id, limit);
+                detail += $", limite relevée à {limit}";
+            }
         }
 
-        _store.SetBatchState(id, BatchStates.Active, null);
         _ = _notifier.PublishAsync(new LinkEvent(EventKind.BatchUnblocked, b.UserId, _library.UserName(b.UserId), b.Label, id, detail));
         return NoContent();
     }
@@ -161,7 +170,7 @@ public sealed class AdminController : ControllerBase
             return NotFound();
         }
 
-        if (b.State is BatchStates.Active or BatchStates.Blocked)
+        if (BatchStates.Effective(b.State, b.ExpiresAt, Now) is BatchStates.Active or BatchStates.Blocked)
         {
             _store.SetBatchState(id, BatchStates.Revoked, "révoqué par l'administrateur");
             _ = _notifier.PublishAsync(new LinkEvent(EventKind.BatchRevoked, b.UserId, _library.UserName(b.UserId), b.Label, id, "révoqué par l'administrateur"));
@@ -267,14 +276,14 @@ public sealed class AdminController : ControllerBase
         return new WebhookTestResult(ok, message);
     }
 
-    /// <summary>"Tout révoquer": a new signing secret kills every link ever issued, and every open batch is revoked.</summary>
+    /// <summary>"Tout révoquer": every open batch is revoked (that is what kills the links); the new signing secret protects against a leaked one.</summary>
     [HttpPost("revoke-all")]
     public ActionResult<RevokeAllResult> RevokeAll()
     {
+        var n = _store.RevokeAll("tout révoqué par l'administrateur", Now);
         var plugin = Plugin.Instance!;
         plugin.Configuration.SigningSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         plugin.SaveConfiguration();
-        var n = _store.RevokeAll("tout révoqué par l'administrateur", Now);
         _ = _notifier.PublishAsync(new LinkEvent(EventKind.AllRevoked, Guid.Empty, "admin", string.Empty, 0, $"{n} lots révoqués, secret renouvelé"));
         return new RevokeAllResult(n);
     }

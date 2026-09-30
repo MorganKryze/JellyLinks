@@ -36,6 +36,11 @@ public static class SettingsRules
             errors.Add("Volume du quota : positif ou nul (0 = illimité).");
         }
 
+        if (s.WebhookUrl is null || s.PublicBaseUrl is null || s.WebhookFormat is null)
+        {
+            return new[] { "Réglages incomplets : adresse du webhook, format et adresse publique sont requis." };
+        }
+
         if (s.WebhookFormat is not ("ntfy" or "json"))
         {
             errors.Add("Format du webhook : ntfy ou json.");

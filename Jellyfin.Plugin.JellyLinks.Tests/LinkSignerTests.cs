@@ -43,4 +43,11 @@ public class LinkSignerTests
     {
         Assert.False(new LinkSigner(Key).TryVerify(token, out _, out _));
     }
+
+    [Fact]
+    public void A_key_shorter_than_32_bytes_is_refused()
+    {
+        Assert.Throws<ArgumentException>(() => new LinkSigner(Array.Empty<byte>()));
+        Assert.Throws<ArgumentException>(() => new LinkSigner(new byte[31]));
+    }
 }
