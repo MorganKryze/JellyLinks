@@ -18,6 +18,8 @@ public sealed record ResolvedFile(
     string? ItemName = null,
     string? Fallback = null);
 
+public sealed record UserSummary(Guid Id, string Name, bool CanDownload, bool IsAdmin);
+
 /// <summary>Everything the plugin needs from Jellyfin, behind one seam.</summary>
 public interface ILibraryGateway
 {
@@ -33,6 +35,9 @@ public interface ILibraryGateway
 
     /// <summary>Display name of a user, for notifications.</summary>
     string UserName(Guid userId);
+
+    /// <summary>Every user, by name, with the two permissions the panel shows.</summary>
+    IReadOnlyList<UserSummary> Users();
 }
 
 public sealed record LocatedFile(string Path, Guid ItemId, string MediaSourceId, int? StreamIndex);

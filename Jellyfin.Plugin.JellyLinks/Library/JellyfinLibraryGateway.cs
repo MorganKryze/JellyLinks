@@ -52,6 +52,13 @@ public sealed class JellyfinLibraryGateway : ILibraryGateway
         return files.DistinctBy(f => (f.MediaSourceId, f.StreamIndex)).ToList();
     }
 
+    public IReadOnlyList<UserSummary> Users() =>
+        _users.GetUsers()
+            .Select(u => new UserSummary(u.Id, u.Username, u.HasPermission(PermissionKind.EnableContentDownloading),
+                u.HasPermission(PermissionKind.IsAdministrator)))
+            .OrderBy(u => u.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
     public Location Locate(Guid userId, LinkRecord link)
     {
         var user = _users.GetUserById(userId);

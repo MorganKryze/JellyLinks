@@ -12,6 +12,10 @@ public sealed class FakeLibraryGateway : ILibraryGateway
     /// <summary>Simulates a file found again under a new identity after a rename.</summary>
     public LocatedFile? MovedTo { get; set; }
 
+    public List<UserSummary> UserList { get; } = new();
+
+    public IReadOnlyList<UserSummary> Users() => UserList;
+
     public List<ResolvedFile> Files { get; } = new();
 
     public Location Locate(Guid userId, LinkRecord link)
