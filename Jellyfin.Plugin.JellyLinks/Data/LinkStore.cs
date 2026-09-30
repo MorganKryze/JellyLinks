@@ -6,7 +6,7 @@ using Microsoft.Data.Sqlite;
 namespace Jellyfin.Plugin.JellyLinks.Data;
 
 /// <summary>The plugin's own SQLite database. Never jellyfin.db.</summary>
-public sealed class LinkStore
+public sealed partial class LinkStore
 {
     private const int SchemaVersion = 2;
     private readonly string _connectionString;
