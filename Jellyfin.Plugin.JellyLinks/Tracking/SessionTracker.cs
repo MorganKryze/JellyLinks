@@ -7,7 +7,7 @@ public sealed class SessionTracker
 {
     public const long IdleSeconds = 1800;
 
-    // ponytail: one lock for all sessions; per-session locks if flush contention ever shows up
+    // one lock for all sessions; per-session locks if flush contention ever shows up
     private readonly object _gate = new();
     private readonly LinkStore _store;
     private readonly TimeProvider _clock;

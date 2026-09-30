@@ -17,7 +17,7 @@ public sealed class Notifier
     private readonly LinkStore? _journal;
     private readonly TimeProvider _clock;
 
-    // ponytail: in memory — a restart may let one extra "quota reached" through
+    // in memory: a restart may let one extra "quota reached" alert through
     private readonly ConcurrentDictionary<Guid, long> _quotaNotified = new();
 
     public Notifier(IActivitySink sink, IHttpClientFactory http, Func<PluginConfiguration> config, ILogger<Notifier> log,
