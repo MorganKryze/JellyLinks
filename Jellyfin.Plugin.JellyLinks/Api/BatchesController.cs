@@ -67,9 +67,10 @@ public sealed class BatchesController : ControllerBase
     private readonly Func<PluginConfiguration> _config;
     private readonly TimeProvider _clock;
     private readonly Notifier _notifier;
+    private readonly SigningKey _key;
 
     public BatchesController(LinkStore store, ILibraryGateway library, QuotaService quotas,
-                             Func<PluginConfiguration> config, TimeProvider clock, Notifier notifier)
+                             Func<PluginConfiguration> config, TimeProvider clock, Notifier notifier, SigningKey key)
     {
         _store = store;
         _library = library;
@@ -77,13 +78,14 @@ public sealed class BatchesController : ControllerBase
         _config = config;
         _clock = clock;
         _notifier = notifier;
+        _key = key;
     }
 
     private Guid UserId => Guid.Parse(User.FindFirstValue("Jellyfin-UserId")!);
 
     private long Now => _clock.GetUtcNow().ToUnixTimeSeconds();
 
-    private LinkSigner Signer => new(Convert.FromBase64String(_config().SigningSecret));
+    private LinkSigner Signer => new(_key.Current);
 
     [HttpPost("preview")]
     public ActionResult<PreviewResponse> Preview([FromBody] CreateBatchRequest req)

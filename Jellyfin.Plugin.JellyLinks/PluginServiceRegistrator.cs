@@ -24,7 +24,8 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             store.Migrate();
             return store;
         });
-        services.AddTransient(sp => new LinkSigner(Convert.FromBase64String(sp.GetRequiredService<Func<PluginConfiguration>>()().SigningSecret)));
+        services.AddSingleton(_ => Plugin.Instance!.SigningKey);
+        services.AddTransient(sp => new LinkSigner(sp.GetRequiredService<SigningKey>().Current));
         services.AddSingleton<ILibraryGateway, JellyfinLibraryGateway>();
         services.AddSingleton<IActivitySink, JellyfinActivitySink>();
         services.AddSingleton<Notifier>();

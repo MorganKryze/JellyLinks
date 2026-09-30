@@ -1,9 +1,9 @@
 using System.Reflection;
 using System.Runtime.Loader;
-using System.Security.Cryptography;
 using System.Text.Json;
 using Jellyfin.Plugin.JellyLinks.Client;
 using Jellyfin.Plugin.JellyLinks.Configuration;
+using Jellyfin.Plugin.JellyLinks.Signing;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
 using MediaBrowser.Model.Plugins;
@@ -25,9 +25,11 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         Directory.CreateDirectory(DataFolderPath);
         DatabasePath = Path.Combine(DataFolderPath, "jellylinks.db");
 
-        if (string.IsNullOrEmpty(Configuration.SigningSecret))
+        // The key lives in its own file; an older configuration's secret is imported once, then cleared.
+        SigningKey = new SigningKey(Path.Combine(DataFolderPath, "signing.key"), Configuration.SigningSecret);
+        if (!string.IsNullOrEmpty(Configuration.SigningSecret))
         {
-            Configuration.SigningSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+            Configuration.SigningSecret = string.Empty;
             SaveConfiguration();
         }
 
@@ -37,6 +39,8 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     public static Plugin? Instance { get; private set; }
 
     public string DatabasePath { get; }
+
+    public SigningKey SigningKey { get; }
 
     public override string Name => "JellyLinks";
 

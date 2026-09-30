@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Jellyfin.Plugin.JellyLinks.Configuration;
 using Jellyfin.Plugin.JellyLinks.Data;
 using Jellyfin.Plugin.JellyLinks.Library;
@@ -46,9 +45,10 @@ public sealed class AdminController : ControllerBase
     private readonly Notifier _notifier;
     private readonly Func<PluginConfiguration> _config;
     private readonly TimeProvider _clock;
+    private readonly SigningKey _key;
 
     public AdminController(LinkStore store, ILibraryGateway library, QuotaService quotas, Notifier notifier,
-                           Func<PluginConfiguration> config, TimeProvider clock)
+                           Func<PluginConfiguration> config, TimeProvider clock, SigningKey key)
     {
         _store = store;
         _library = library;
@@ -56,6 +56,7 @@ public sealed class AdminController : ControllerBase
         _notifier = notifier;
         _config = config;
         _clock = clock;
+        _key = key;
     }
 
     private long Now => _clock.GetUtcNow().ToUnixTimeSeconds();
@@ -120,7 +121,7 @@ public sealed class AdminController : ControllerBase
             return Array.Empty<string>();
         }
 
-        var signer = new LinkSigner(Convert.FromBase64String(_config().SigningSecret));
+        var signer = new LinkSigner(_key.Current);
         var baseUrl = LinkUrlBuilder.BaseUrl(_config().PublicBaseUrl, $"{Request.Scheme}://{Request.Host}{Request.PathBase}");
         return _store.GetLinks(id).Select(l => LinkUrlBuilder.Build(baseUrl, signer.Sign(l.Id, b.ExpiresAt), l.FileName)).ToList();
     }
@@ -281,9 +282,7 @@ public sealed class AdminController : ControllerBase
     public ActionResult<RevokeAllResult> RevokeAll()
     {
         var n = _store.RevokeAll("tout révoqué par l'administrateur", Now);
-        var plugin = Plugin.Instance!;
-        plugin.Configuration.SigningSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        plugin.SaveConfiguration();
+        _key.Rotate();
         _ = _notifier.PublishAsync(new LinkEvent(EventKind.AllRevoked, Guid.Empty, "admin", string.Empty, 0, $"{n} lots révoqués, secret renouvelé"));
         return new RevokeAllResult(n);
     }

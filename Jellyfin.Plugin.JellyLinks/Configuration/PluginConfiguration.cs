@@ -29,7 +29,7 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool NotifyQuotaReached { get; set; } = true;
     public bool NotifyBatchCompleted { get; set; }
 
-    /// <summary>Base64 HMAC key. Generated on first start; rotating it revokes every link.</summary>
+    /// <summary>Legacy: a key from before 0.2 is imported into signing.key on start, then this is cleared.</summary>
     public string SigningSecret { get; set; } = string.Empty;
 
     /// <summary>Public address used to build links, e.g. https://jellyfin.example. Empty: taken from the request.</summary>
