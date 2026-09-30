@@ -10,10 +10,11 @@ dist="$root/dist"
 rm -rf "$dist"
 mkdir -p "$dist/stage"
 
+# Everything but the final version=/checksum= lines goes to stderr: the CI appends stdout to $GITHUB_OUTPUT.
 dotnet build "$root/Jellyfin.Plugin.JellyLinks/JellyLinks.csproj" --configuration Release --no-incremental --nologo -v q \
-  -p:Version="$full" -p:AssemblyVersion="$full" -p:FileVersion="$full"
-cp "$root/Jellyfin.Plugin.JellyLinks/bin/Release/net9.0/Jellyfin.Plugin.JellyLinks.dll" "$dist/stage/"
-cp "$root/assets/icon.png" "$dist/stage/"
+  -p:Version="$full" -p:AssemblyVersion="$full" -p:FileVersion="$full" >&2
+cp "$root/Jellyfin.Plugin.JellyLinks/bin/Release/net9.0/Jellyfin.Plugin.JellyLinks.dll" "$dist/stage/" >&2
+cp "$root/assets/icon.png" "$dist/stage/" >&2
 
 # Jellyfin reads these keys case-sensitively (camelCase): PascalCase ones are silently ignored.
 jq -n --arg ver "$full" --arg abi "$abi" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%S)" '{
@@ -28,7 +29,7 @@ jq -n --arg ver "$full" --arg abi "$abi" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%S)
   assemblies: ["Jellyfin.Plugin.JellyLinks.dll"]
 }' > "$dist/stage/meta.json"
 
-(cd "$dist/stage" && zip -q -X "$dist/Jellyfin.Plugin.JellyLinks.zip" Jellyfin.Plugin.JellyLinks.dll meta.json icon.png)
+(cd "$dist/stage" && zip -q -X "$dist/Jellyfin.Plugin.JellyLinks.zip" Jellyfin.Plugin.JellyLinks.dll meta.json icon.png) >&2
 checksum="$( (md5sum "$dist/Jellyfin.Plugin.JellyLinks.zip" 2>/dev/null || md5 -r "$dist/Jellyfin.Plugin.JellyLinks.zip") | awk '{print toupper($1)}')"
 echo "version=$full"
 echo "checksum=$checksum"

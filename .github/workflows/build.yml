@@ -3,9 +3,12 @@ name: Build
 on:
   push:
     branches: ["main"]
-    tags: ["v*"]
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
   pull_request:
     branches: ["main"]
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -25,6 +28,9 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
+    concurrency:
+      group: release
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
@@ -38,6 +44,10 @@ jobs:
       - name: Package
         id: package
         run: scripts/package.sh "${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" dist/Jellyfin.Plugin.JellyLinks.zip --clobber
       - name: Update manifest
         env:
           GH_TOKEN: ${{ github.token }}
@@ -54,14 +64,14 @@ jobs:
           git fetch origin main
           git checkout main
           jq --arg ver "$VERSION" --arg chk "$CHECKSUM" --arg ts "$TIMESTAMP" --arg url "$SOURCE_URL" --arg log "$CHANGELOG" \
-            '.[0].versions = ([{ version: $ver, checksum: $chk, changelog: $log, targetAbi: "10.11.10.0", sourceUrl: $url, timestamp: $ts }] + .[0].versions)' \
+            'if any(.[0].versions[]; .version == $ver) then . else .[0].versions = ([{ version: $ver, checksum: $chk, changelog: $log, targetAbi: "10.11.10.0", sourceUrl: $url, timestamp: $ts }] + .[0].versions) end' \
             manifest.json > manifest.tmp && mv manifest.tmp manifest.json
+          if git diff --quiet -- manifest.json; then
+            echo "manifest already up to date for ${TAG}"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add manifest.json
           git commit -m "chore: update manifest for ${TAG}"
           git push origin main
-      - name: Upload release asset
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${GITHUB_REF_NAME}" dist/Jellyfin.Plugin.JellyLinks.zip --clobber
