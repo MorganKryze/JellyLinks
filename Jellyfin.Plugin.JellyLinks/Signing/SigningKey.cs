@@ -92,10 +92,16 @@ public sealed class SigningKey
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
         var tmp = _path + ".tmp";
-        File.WriteAllBytes(tmp, key);
+        var options = new FileStreamOptions { Mode = FileMode.Create, Access = FileAccess.Write };
         if (!OperatingSystem.IsWindows())
         {
-            File.SetUnixFileMode(tmp, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite; // private from the first byte
+        }
+
+        using (var stream = new FileStream(tmp, options))
+        {
+            stream.Write(key);
+            stream.Flush(true); // fsync before the rename makes it the key
         }
 
         File.Move(tmp, _path, overwrite: true);
