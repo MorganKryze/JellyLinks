@@ -1,5 +1,6 @@
 using Jellyfin.Plugin.JellyLinks.Configuration;
 using Jellyfin.Plugin.JellyLinks.Data;
+using Jellyfin.Plugin.JellyLinks.Library;
 using Jellyfin.Plugin.JellyLinks.Notify;
 using Jellyfin.Plugin.JellyLinks.Policy;
 using Jellyfin.Plugin.JellyLinks.Signing;
@@ -178,6 +179,34 @@ public sealed class FileGateTests : IDisposable
         var r = await _gate.CheckAsync(Token(), "9.9.9.9", true);
         Assert.Equal(GateOutcome.Serve, r.Outcome);
         Assert.Empty(_sink.Events);
+    }
+
+    [Fact]
+    public async Task A_renamed_file_is_served_and_the_link_follows_it()
+    {
+        var renamed = Path.Combine(Path.GetTempPath(), $"jl-{Guid.NewGuid():N}.mkv");
+        File.WriteAllBytes(renamed, new byte[2000]);
+        try
+        {
+            var newItem = Guid.NewGuid();
+            _lib.MovedTo = new LocatedFile(renamed, newItem, newItem.ToString("N"), null);
+            var r = await _gate.CheckAsync(Token(), "1.1.1.1", false);
+            Assert.Equal(GateOutcome.Serve, r.Outcome);
+            Assert.Equal(renamed, r.Path);
+            Assert.Equal(newItem, r.Link!.ItemId);
+            Assert.Equal(2000, _t.Store.GetLink(_link.Id)!.Size);
+        }
+        finally
+        {
+            File.Delete(renamed);
+        }
+    }
+
+    [Fact]
+    public async Task An_ambiguous_rename_is_gone()
+    {
+        _lib.Path = null; // the gateway found zero or several candidates
+        Assert.Equal(GateOutcome.Gone, (await _gate.CheckAsync(Token(), "1.1.1.1", false)).Outcome);
     }
 
     public void Dispose()

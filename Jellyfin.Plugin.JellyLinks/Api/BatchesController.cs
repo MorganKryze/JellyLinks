@@ -162,7 +162,7 @@ public sealed class BatchesController : ControllerBase
 
         var now = Now;
         var id = _store.CreateBatch(UserId, now, now + (_config().LinkValidityDays * 86_400L), BatchLabel.For(files), selection,
-            files.Select(f => new LinkRecord(0, 0, f.ItemId, f.MediaSourceId, f.FileName, f.Size, f.Kind, f.StreamIndex, f.Title)).ToList());
+            files.Select(f => new LinkRecord(0, 0, f.ItemId, f.MediaSourceId, f.FileName, f.Size, f.Kind, f.StreamIndex, f.Title, f.Fallback)).ToList());
         return ToResponse(_store.GetBatch(id)!);
     }
 

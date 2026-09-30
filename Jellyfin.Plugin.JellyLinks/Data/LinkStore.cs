@@ -158,6 +158,14 @@ public sealed class LinkStore
     public bool MarkCompletedNotified(long id) =>
         Exec("UPDATE batches SET completed_notified = 1 WHERE id = $id AND completed_notified = 0", ("$id", id)) == 1;
 
+    /// <summary>Points a link at its file found again after a rename. Coverage restarts unless the file was already fully received.</summary>
+    public void Relink(long linkId, Guid itemId, string mediaSourceId, int? streamIndex, long size) =>
+        Exec("""
+            UPDATE links SET item_id = $i, media_source_id = $m, stream_index = $x, size = $z,
+              covered = CASE WHEN complete = 1 THEN covered ELSE '' END
+            WHERE id = $id;
+            """, ("$i", itemId.ToString()), ("$m", mediaSourceId), ("$x", (object?)streamIndex ?? DBNull.Value), ("$z", size), ("$id", linkId));
+
     public LinkRecord? GetLink(long id) =>
         Query(LinkSql + " WHERE id = $id", ReadLink, ("$id", id)).FirstOrDefault();
 

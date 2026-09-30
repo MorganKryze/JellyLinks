@@ -63,18 +63,22 @@ public sealed class FileGate
             return Deny(GateOutcome.Forbidden, link, batch);
         }
 
-        // 4. Jellyfin permission, re-checked on every request (an item gone from the library is 410, not 403)
-        if (!_library.CanDownload(batch.UserId, link.ItemId))
+        // 4–5. Jellyfin permission, re-checked on every request; then the file, found again after a rename if needed
+        var location = _library.Locate(batch.UserId, link);
+        if (location.Outcome != LocateOutcome.Found)
         {
-            return Deny(_library.ItemExists(link.ItemId) ? GateOutcome.Forbidden : GateOutcome.Gone, link, batch);
+            return Deny(location.Outcome == LocateOutcome.Forbidden ? GateOutcome.Forbidden : GateOutcome.Gone, link, batch);
         }
 
-        // 5. file still there (path resolved now, never stored)
-        var path = _library.ResolvePath(batch.UserId, link.ItemId, link.MediaSourceId, link.StreamIndex);
-        if (path is null || !File.Exists(path))
+        var found = location.File!;
+        if (found.ItemId != link.ItemId || found.StreamIndex != link.StreamIndex
+            || !string.Equals(found.MediaSourceId, link.MediaSourceId, StringComparison.OrdinalIgnoreCase))
         {
-            return Deny(GateOutcome.Gone, link, batch);
+            _store.Relink(link.Id, found.ItemId, found.MediaSourceId, found.StreamIndex, new FileInfo(found.Path).Length);
+            link = _store.GetLink(link.Id)!;
         }
+
+        var path = found.Path;
 
         if (isHead)
         {

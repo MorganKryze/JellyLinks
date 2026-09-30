@@ -2,6 +2,7 @@ using Jellyfin.Data;
 using Jellyfin.Data.Enums;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Database.Implementations.Enums;
+using Jellyfin.Plugin.JellyLinks.Data;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
@@ -25,16 +26,6 @@ public sealed class JellyfinLibraryGateway : ILibraryGateway
         _sources = sources;
         _userData = userData;
     }
-
-    public bool CanDownload(Guid userId, Guid itemId)
-    {
-        var user = _users.GetUserById(userId);
-        return user is not null
-            && user.HasPermission(PermissionKind.EnableContentDownloading)
-            && Visible(itemId, user) is not null;
-    }
-
-    public bool ItemExists(Guid itemId) => _library.GetItemById(itemId) is not null;
 
     public IReadOnlyList<ResolvedFile> Expand(Guid userId, IReadOnlyList<Guid> rootItemIds, bool allVersions, bool includeSubtitles)
     {
@@ -61,29 +52,43 @@ public sealed class JellyfinLibraryGateway : ILibraryGateway
         return files.DistinctBy(f => (f.MediaSourceId, f.StreamIndex)).ToList();
     }
 
-    public string? ResolvePath(Guid userId, Guid itemId, string mediaSourceId, int? streamIndex)
+    public Location Locate(Guid userId, LinkRecord link)
     {
         var user = _users.GetUserById(userId);
-        var item = user is null ? null : Visible(itemId, user);
-        if (user is null || item is null)
+        if (user is null || !user.HasPermission(PermissionKind.EnableContentDownloading))
         {
-            return null;
+            return Location.Forbidden;
         }
 
-        var source = _sources.GetStaticMediaSources(item, false, user)
-            .FirstOrDefault(s => string.Equals(s.Id, mediaSourceId, StringComparison.OrdinalIgnoreCase));
-        if (source is null)
+        var key = FallbackKey.FromJson(link.Fallback);
+        var item = Visible(link.ItemId, user);
+        if (item is not null)
         {
-            return null;
+            var here = FileIn(user, item, link, key, byKey: false);
+            if (here is not null)
+            {
+                return Location.Found(here);
+            }
+        }
+        else if (_library.GetItemById(link.ItemId) is not null)
+        {
+            return Location.Forbidden; // still in the library, not for this user
         }
 
-        if (streamIndex is null)
+        // Renamed (new id), or a ghost row whose file is gone: look for exactly one replacement.
+        if (key is null)
         {
-            return source.Path;
+            return Location.Gone;
         }
 
-        return source.MediaStreams
-            .FirstOrDefault(m => m.Index == streamIndex && m.Type == MediaStreamType.Subtitle && m.IsExternal)?.Path;
+        var candidates = Candidates(user, key);
+        if (candidates.Count != 1)
+        {
+            return Location.Gone; // none, or ambiguous: never guess
+        }
+
+        var moved = FileIn(user, candidates[0], link, key, byKey: true);
+        return moved is null ? Location.Gone : Location.Found(moved);
     }
 
     public string UserName(Guid userId) => _users.GetUserById(userId)?.Username ?? userId.ToString("N");
@@ -130,7 +135,8 @@ public sealed class JellyfinLibraryGateway : ILibraryGateway
 
             yield return new ResolvedFile(Guid.Parse(source.Id), source.Id, Path.GetFileName(source.Path),
                 source.Size ?? new FileInfo(source.Path).Length, "video", null, title,
-                episode?.ParentIndexNumber, episode?.IndexNumber, source.Name, played, episode?.Name);
+                episode?.ParentIndexNumber, episode?.IndexNumber, source.Name, played, episode?.Name,
+                KeyOf(video, sources.Count, source.Name, null).ToJson());
 
             if (!includeSubtitles)
             {
@@ -141,8 +147,108 @@ public sealed class JellyfinLibraryGateway : ILibraryGateway
             {
                 yield return new ResolvedFile(Guid.Parse(source.Id), source.Id, Path.GetFileName(sub.Path),
                     new FileInfo(sub.Path).Length, "subtitle", sub.Index, title,
-                    episode?.ParentIndexNumber, episode?.IndexNumber, source.Name, played, episode?.Name);
+                    episode?.ParentIndexNumber, episode?.IndexNumber, source.Name, played, episode?.Name,
+                    KeyOf(video, sources.Count, source.Name, FallbackKey.SuffixOf(Path.GetFileName(source.Path), Path.GetFileName(sub.Path))).ToJson());
             }
         }
+    }
+
+    private static FallbackKey KeyOf(BaseItem video, int versionCount, string? version, string? subtitleSuffix)
+    {
+        var episode = video as Episode;
+        return new FallbackKey(
+            episode is null ? "Movie" : "Episode",
+            new Dictionary<string, string>(video.ProviderIds ?? new Dictionary<string, string>()),
+            video.Name,
+            video.ProductionYear,
+            episode?.SeriesPresentationUniqueKey,
+            episode?.Series?.ProviderIds is { } sp ? new Dictionary<string, string>(sp) : null,
+            episode?.ParentIndexNumber,
+            episode?.IndexNumber,
+            version,
+            versionCount,
+            subtitleSuffix);
+    }
+
+    /// <summary>The link's file on this item: the stored source (or, after a rename, the one the key picks); subtitles by suffix first.</summary>
+    private LocatedFile? FileIn(User user, BaseItem item, LinkRecord link, FallbackKey? key, bool byKey)
+    {
+        var sources = _sources.GetStaticMediaSources(item, false, user).ToList();
+        MediaSourceInfo? source;
+        if (byKey)
+        {
+            var pick = key?.PickSource(sources.Select(s => s.Name).ToList());
+            source = pick is int i ? sources[i] : null;
+        }
+        else
+        {
+            source = sources.FirstOrDefault(s => string.Equals(s.Id, link.MediaSourceId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (source is null || string.IsNullOrEmpty(source.Path))
+        {
+            return null;
+        }
+
+        if (link.Kind != "subtitle")
+        {
+            return File.Exists(source.Path) ? new LocatedFile(source.Path, Guid.Parse(source.Id), source.Id, null) : null;
+        }
+
+        var subs = source.MediaStreams
+            .Where(m => m.Type == MediaStreamType.Subtitle && m.IsExternal && !string.IsNullOrEmpty(m.Path))
+            .ToList();
+        var bySuffix = FallbackKey.PickSubtitle(Path.GetFileName(source.Path), subs.Select(m => m.Path).ToList(), key?.SubtitleSuffix);
+        var sub = bySuffix is int j ? subs[j] : (byKey ? null : subs.FirstOrDefault(m => m.Index == link.StreamIndex));
+        return sub is not null && File.Exists(sub.Path) ? new LocatedFile(sub.Path, Guid.Parse(source.Id), source.Id, sub.Index) : null;
+    }
+
+    private List<BaseItem> Candidates(User user, FallbackKey key)
+    {
+        IEnumerable<BaseItem> found = Array.Empty<BaseItem>();
+        if (key.Kind == "Episode" && key.Season is int season && key.Episode is int number)
+        {
+            found = Episodes(user, key.SeriesKey, season, number);
+            if (!found.Any() && key.SeriesProviderIds is { Count: > 0 } sp)
+            {
+                var series = Query(user, BaseItemKind.Series, q => q.HasAnyProviderId = new Dictionary<string, string>(sp));
+                found = series.Count == 1 ? Episodes(user, series[0].PresentationUniqueKey, season, number) : Array.Empty<BaseItem>();
+            }
+        }
+        else if (key.ProviderIds.Count > 0)
+        {
+            var kind = key.Kind == "Episode" ? BaseItemKind.Episode : BaseItemKind.Movie;
+            found = Query(user, kind, q => q.HasAnyProviderId = new Dictionary<string, string>(key.ProviderIds))
+                .Where(c => key.ProviderIds.All(p => c.ProviderIds is null || !c.ProviderIds.TryGetValue(p.Key, out var v)
+                    || string.Equals(v, p.Value, StringComparison.OrdinalIgnoreCase)));
+        }
+        else if (key.Kind == "Movie")
+        {
+            found = Query(user, BaseItemKind.Movie, q =>
+            {
+                q.Name = key.Name;
+                q.Years = key.Year is int y ? new[] { y } : Array.Empty<int>();
+            });
+        }
+
+        // Series / ancestor filters skip Jellyfin's per-user library filter: re-check every candidate.
+        return found.Where(c => Visible(c.Id, user) is not null).ToList();
+    }
+
+    private IEnumerable<BaseItem> Episodes(User user, string? seriesKey, int season, int number) =>
+        string.IsNullOrEmpty(seriesKey)
+            ? Array.Empty<BaseItem>()
+            : Query(user, BaseItemKind.Episode, q =>
+            {
+                q.SeriesPresentationUniqueKey = seriesKey;
+                q.ParentIndexNumber = season;
+                q.IndexNumber = number;
+            });
+
+    private List<BaseItem> Query(User user, BaseItemKind kind, Action<InternalItemsQuery> filter)
+    {
+        var q = new InternalItemsQuery(user) { IncludeItemTypes = new[] { kind }, Recursive = true, IsVirtualItem = false };
+        filter(q);
+        return _library.GetItemList(q).ToList();
     }
 }
