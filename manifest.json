@@ -7,6 +7,15 @@
     "overview": "Direct download links for the people you share your library with.",
     "description": "Let your users fetch the original files of a movie, a season or a whole series in their download manager (JDownloader or any other) from signed, expiring links. See who downloaded what, when and from where; cap addresses and volume; revoke anything. Managed from the Jellyfin dashboard.",
     "imageUrl": "https://raw.githubusercontent.com/MorganKryze/JellyLinks/main/assets/icon.png",
-    "versions": []
+    "versions": [
+      {
+        "version": "0.2.0.0",
+        "checksum": "969AE2ABBEB75FB1551E6642EEB32AEE",
+        "changelog": "First public release.\r\n\r\nJellyLinks gives the people you share your library with direct download links to the original files (a movie, a season, a whole series) for JDownloader or any download manager, and gives you full control over them.\r\n\r\n**For your users**\r\n- A « Liens de téléchargement » button on movie, series, season and episode pages, in the \"…\" menus and in multi-selection.\r\n- Pick the default or all versions, external subtitles, whole seasons or single episodes, \"unwatched only\"; copy the links or download a `.txt`.\r\n- « Mes liens »: every batch with its progress; copy again, revoke, or regenerate an expired one.\r\n\r\n**For you**\r\n- Signed links that expire after 7 days by default, re-checked on every request against the \"Allow media downloading\" permission and library access.\r\n- Resumable downloads (byte ranges, `ETag`, `If-Range`); a renamed file keeps its link working, a deleted one answers `410`.\r\n- Address limit per batch (3 by default), optional quotas (volume over a rolling window, active batches), per-user exceptions.\r\n- Admin panel with five tabs: overview, batches (full session detail), activity log, users, settings. Alerts to Jellyfin's activity log and to a webhook (ntfy or JSON).\r\n- No geolocation; session details are kept 90 days, then folded into monthly totals without any address.\r\n\r\n**Requirements**\r\n- Jellyfin 10.11.10+ or 12.0.\r\n- JavaScript Injector 4.0+ (File Transformation is not needed). JellyLinks registers its script by itself.\r\n- Behind a reverse proxy, declare it in Dashboard → Networking → Known proxies.\r\n\r\nThe interface is in French.\r",
+        "targetAbi": "10.11.10.0",
+        "sourceUrl": "https://github.com/MorganKryze/JellyLinks/releases/download/v0.2.0/Jellyfin.Plugin.JellyLinks.zip",
+        "timestamp": "2026-09-30T15:23:58"
+      }
+    ]
   }
 ]
