@@ -94,4 +94,23 @@ public class SessionTrackerTests
         Assert.Equal(1000, stored.BytesSent);
         Assert.False(tracker.Record(ref a, link, User, 0, 10));
     }
+
+    [Fact]
+    public void A_file_finished_from_two_addresses_is_complete_once()
+    {
+        var (t, clock, tracker, link) = Setup();
+        using var __ = t;
+        var first = tracker.Begin(link, "1.1.1.1", "jd", true);
+        Assert.False(tracker.Record(ref first, link, User, 0, 600));
+
+        clock.Advance(TimeSpan.FromMinutes(45));
+        var second = tracker.Begin(link, "2.2.2.2", "jd", true);
+        Assert.NotEqual(first.Id, second.Id);
+        Assert.True(tracker.Record(ref second, link, User, 600, 400));
+        Assert.False(tracker.Record(ref second, link, User, 0, 10));
+
+        Assert.True(t.Store.GetLink(link.Id)!.Complete);
+        Assert.Equal(SessionStatuses.Complete, t.Store.GetLatestSession(link.Id, "2.2.2.2")!.Status);
+        Assert.Equal(SessionStatuses.InProgress, t.Store.GetLatestSession(link.Id, "1.1.1.1")!.Status);
+    }
 }

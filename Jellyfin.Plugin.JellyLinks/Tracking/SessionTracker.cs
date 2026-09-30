@@ -2,7 +2,7 @@ using Jellyfin.Plugin.JellyLinks.Data;
 
 namespace Jellyfin.Plugin.JellyLinks.Tracking;
 
-/// <summary>Groups requests into sessions (same link + same address, under 30 min apart) and keeps their status.</summary>
+/// <summary>Groups requests into sessions (same link + same address, under 30 min apart) and keeps their status; completion is per link, across sessions.</summary>
 public sealed class SessionTracker
 {
     public const long IdleSeconds = 1800;
@@ -48,8 +48,9 @@ public sealed class SessionTracker
             var now = Now;
             var stored = _store.GetSession(session.Id) ?? session;
             var ranges = ByteRanges.Add(ByteRanges.Parse(stored.Ranges), start, start + bytes - 1);
-            var wasComplete = stored.Status == SessionStatuses.Complete;
-            var isComplete = wasComplete || ByteRanges.Covers(ranges, link.Size);
+            // "terminé" is decided per link, across every session (a resume from another address counts).
+            var linkDone = _store.AddCoverage(link.Id, start, start + bytes - 1, link.Size);
+            var isComplete = stored.Status == SessionStatuses.Complete || linkDone || ByteRanges.Covers(ranges, link.Size);
 
             session = stored with
             {
@@ -61,7 +62,7 @@ public sealed class SessionTracker
             _store.UpdateSession(session);
             _store.AddUsage(userId, now / 86_400, bytes);
 
-            return isComplete && !wasComplete;
+            return linkDone;
         }
     }
 }

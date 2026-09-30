@@ -162,7 +162,7 @@ public sealed class BatchesController : ControllerBase
 
         var now = Now;
         var id = _store.CreateBatch(UserId, now, now + (_config().LinkValidityDays * 86_400L), BatchLabel.For(files), selection,
-            files.Select(f => new LinkRecord(0, 0, f.ItemId, f.MediaSourceId, f.FileName, f.Size, f.Kind, f.StreamIndex)).ToList());
+            files.Select(f => new LinkRecord(0, 0, f.ItemId, f.MediaSourceId, f.FileName, f.Size, f.Kind, f.StreamIndex, f.Title)).ToList());
         return ToResponse(_store.GetBatch(id)!);
     }
 
@@ -175,14 +175,15 @@ public sealed class BatchesController : ControllerBase
         var complete = 0;
         foreach (var l in links)
         {
-            var s = _store.GetLatestSessionForLink(l.Id);
-            if (s?.Status == SessionStatuses.Complete)
+            if (l.Complete)
             {
                 complete++;
             }
 
+            var status = l.Complete ? SessionStatuses.Complete : _store.GetLatestSessionForLink(l.Id)?.Status ?? "pending";
+
             var url = state == BatchStates.Active ? LinkUrlBuilder.Build(baseUrl, Signer.Sign(l.Id, b.ExpiresAt), l.FileName) : string.Empty;
-            views.Add(new LinkView(l.FileName, l.Size, l.Kind, url, s?.Status ?? "pending", s is null ? 0 : ByteRanges.CoveredBytes(s.Ranges)));
+            views.Add(new LinkView(l.FileName, l.Size, l.Kind, url, status, ByteRanges.CoveredBytes(l.Covered)));
         }
 
         return new BatchResponse(b.Id, b.Label, b.CreatedAt, b.ExpiresAt, state, links.Count, links.Sum(l => l.Size), complete, views);

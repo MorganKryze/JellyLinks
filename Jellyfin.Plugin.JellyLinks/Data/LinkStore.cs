@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using Jellyfin.Plugin.JellyLinks.Tracking;
 using Microsoft.Data.Sqlite;
 
 namespace Jellyfin.Plugin.JellyLinks.Data;
@@ -7,7 +8,7 @@ namespace Jellyfin.Plugin.JellyLinks.Data;
 /// <summary>The plugin's own SQLite database. Never jellyfin.db.</summary>
 public sealed class LinkStore
 {
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
     private readonly string _connectionString;
 
     public LinkStore(string dbPath)
@@ -19,78 +20,103 @@ public sealed class LinkStore
         }.ToString();
     }
 
-    public void Migrate()
+    public void Migrate() => Migrate(SchemaVersion);
+
+    /// <summary>Applies the missing schema steps in order, each in its own transaction.</summary>
+    internal void Migrate(int target)
     {
         using var c = Open();
         Exec(c, "PRAGMA journal_mode=WAL;");
         var version = Convert.ToInt32(Scalar(c, "PRAGMA user_version;"), CultureInfo.InvariantCulture);
-        if (version >= SchemaVersion)
+        for (var v = version + 1; v <= target; v++)
         {
-            return;
+            using var tx = c.BeginTransaction();
+            Exec(c, Steps[v - 1], tx);
+            Exec(c, $"PRAGMA user_version = {v};", tx);
+            tx.Commit();
         }
-
-        using var tx = c.BeginTransaction();
-        Exec(c, """
-            CREATE TABLE batches (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              user_id TEXT NOT NULL,
-              created_at INTEGER NOT NULL,
-              expires_at INTEGER NOT NULL,
-              label TEXT NOT NULL,
-              selection TEXT NOT NULL,
-              state TEXT NOT NULL,
-              blocked_reason TEXT,
-              ip_limit_override INTEGER,
-              completed_notified INTEGER NOT NULL DEFAULT 0);
-            CREATE INDEX ix_batches_user ON batches(user_id, created_at);
-            CREATE TABLE links (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              batch_id INTEGER NOT NULL REFERENCES batches(id),
-              item_id TEXT NOT NULL,
-              media_source_id TEXT NOT NULL,
-              file_name TEXT NOT NULL,
-              size INTEGER NOT NULL,
-              kind TEXT NOT NULL,
-              stream_index INTEGER);
-            CREATE INDEX ix_links_batch ON links(batch_id);
-            CREATE TABLE sessions (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              link_id INTEGER NOT NULL REFERENCES links(id),
-              ip TEXT NOT NULL,
-              user_agent TEXT NOT NULL,
-              first_at INTEGER NOT NULL,
-              last_at INTEGER NOT NULL,
-              bytes_sent INTEGER NOT NULL,
-              ranges TEXT NOT NULL,
-              status TEXT NOT NULL,
-              new_ip INTEGER NOT NULL);
-            CREATE INDEX ix_sessions_link_ip ON sessions(link_id, ip, last_at);
-            CREATE TABLE batch_ips (
-              batch_id INTEGER NOT NULL REFERENCES batches(id),
-              ip TEXT NOT NULL,
-              first_at INTEGER NOT NULL,
-              PRIMARY KEY (batch_id, ip));
-            CREATE TABLE usage (
-              user_id TEXT NOT NULL,
-              day INTEGER NOT NULL,
-              bytes INTEGER NOT NULL,
-              PRIMARY KEY (user_id, day));
-            CREATE TABLE quota_overrides (
-              user_id TEXT PRIMARY KEY,
-              volume_bytes INTEGER NOT NULL,
-              period_days INTEGER NOT NULL,
-              max_active_batches INTEGER NOT NULL);
-            CREATE TABLE totals (
-              user_id TEXT NOT NULL,
-              item_id TEXT NOT NULL,
-              month TEXT NOT NULL,
-              bytes INTEGER NOT NULL,
-              completed_count INTEGER NOT NULL,
-              PRIMARY KEY (user_id, item_id, month));
-            """, tx);
-        Exec(c, $"PRAGMA user_version = {SchemaVersion};", tx);
-        tx.Commit();
     }
+
+    private static readonly string[] Steps = { V1, V2 };
+
+    private const string V1 = """
+        CREATE TABLE batches (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          expires_at INTEGER NOT NULL,
+          label TEXT NOT NULL,
+          selection TEXT NOT NULL,
+          state TEXT NOT NULL,
+          blocked_reason TEXT,
+          ip_limit_override INTEGER,
+          completed_notified INTEGER NOT NULL DEFAULT 0);
+        CREATE INDEX ix_batches_user ON batches(user_id, created_at);
+        CREATE TABLE links (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          batch_id INTEGER NOT NULL REFERENCES batches(id),
+          item_id TEXT NOT NULL,
+          media_source_id TEXT NOT NULL,
+          file_name TEXT NOT NULL,
+          size INTEGER NOT NULL,
+          kind TEXT NOT NULL,
+          stream_index INTEGER);
+        CREATE INDEX ix_links_batch ON links(batch_id);
+        CREATE TABLE sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          link_id INTEGER NOT NULL REFERENCES links(id),
+          ip TEXT NOT NULL,
+          user_agent TEXT NOT NULL,
+          first_at INTEGER NOT NULL,
+          last_at INTEGER NOT NULL,
+          bytes_sent INTEGER NOT NULL,
+          ranges TEXT NOT NULL,
+          status TEXT NOT NULL,
+          new_ip INTEGER NOT NULL);
+        CREATE INDEX ix_sessions_link_ip ON sessions(link_id, ip, last_at);
+        CREATE TABLE batch_ips (
+          batch_id INTEGER NOT NULL REFERENCES batches(id),
+          ip TEXT NOT NULL,
+          first_at INTEGER NOT NULL,
+          PRIMARY KEY (batch_id, ip));
+        CREATE TABLE usage (
+          user_id TEXT NOT NULL,
+          day INTEGER NOT NULL,
+          bytes INTEGER NOT NULL,
+          PRIMARY KEY (user_id, day));
+        CREATE TABLE quota_overrides (
+          user_id TEXT PRIMARY KEY,
+          volume_bytes INTEGER NOT NULL,
+          period_days INTEGER NOT NULL,
+          max_active_batches INTEGER NOT NULL);
+        CREATE TABLE totals (
+          user_id TEXT NOT NULL,
+          item_id TEXT NOT NULL,
+          month TEXT NOT NULL,
+          bytes INTEGER NOT NULL,
+          completed_count INTEGER NOT NULL,
+          PRIMARY KEY (user_id, item_id, month));
+        """;
+
+    // v2: completion per link across sessions, title for statistics, rename fallback key, event journal.
+    private const string V2 = """
+        ALTER TABLE links ADD COLUMN title TEXT NOT NULL DEFAULT '';
+        ALTER TABLE links ADD COLUMN fallback TEXT;
+        ALTER TABLE links ADD COLUMN covered TEXT NOT NULL DEFAULT '';
+        ALTER TABLE links ADD COLUMN complete INTEGER NOT NULL DEFAULT 0;
+        UPDATE links SET complete = 1,
+          covered = (SELECT s.ranges FROM sessions s WHERE s.link_id = links.id AND s.status = 'complete' ORDER BY s.id LIMIT 1)
+        WHERE EXISTS (SELECT 1 FROM sessions s WHERE s.link_id = links.id AND s.status = 'complete');
+        CREATE INDEX ix_links_complete ON links(batch_id, complete);
+        CREATE TABLE events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          at INTEGER NOT NULL,
+          kind TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          batch_id INTEGER,
+          detail TEXT NOT NULL);
+        CREATE INDEX ix_events_at ON events(at);
+        """;
 
     public long CreateBatch(Guid userId, long createdAt, long expiresAt, string label, Selection selection, IReadOnlyList<LinkRecord> links)
     {
@@ -104,10 +130,11 @@ public sealed class LinkStore
         foreach (var l in links)
         {
             Exec(c, """
-                INSERT INTO links (batch_id, item_id, media_source_id, file_name, size, kind, stream_index)
-                VALUES ($b, $i, $m, $f, $z, $k, $x);
+                INSERT INTO links (batch_id, item_id, media_source_id, file_name, size, kind, stream_index, title, fallback)
+                VALUES ($b, $i, $m, $f, $z, $k, $x, $t, $fb);
                 """, tx, ("$b", id), ("$i", l.ItemId.ToString()), ("$m", l.MediaSourceId), ("$f", l.FileName),
-                ("$z", l.Size), ("$k", l.Kind), ("$x", (object?)l.StreamIndex ?? DBNull.Value));
+                ("$z", l.Size), ("$k", l.Kind), ("$x", (object?)l.StreamIndex ?? DBNull.Value),
+                ("$t", l.Title), ("$fb", (object?)l.Fallback ?? DBNull.Value));
         }
 
         tx.Commit();
@@ -190,11 +217,35 @@ public sealed class LinkStore
     }
 
     public bool AllLinksComplete(long batchId) =>
-        Convert.ToInt64(Scalar("""
-            SELECT NOT EXISTS (
-              SELECT 1 FROM links l WHERE l.batch_id = $b AND NOT EXISTS (
-                SELECT 1 FROM sessions s WHERE s.link_id = l.id AND s.status = 'complete'));
-            """, ("$b", batchId)), CultureInfo.InvariantCulture) == 1;
+        Convert.ToInt64(Scalar("SELECT NOT EXISTS (SELECT 1 FROM links WHERE batch_id = $b AND complete = 0);", ("$b", batchId)),
+            CultureInfo.InvariantCulture) == 1;
+
+    /// <summary>Merges a served span into the link's coverage, all sessions together. True once: when the link becomes complete.</summary>
+    public bool AddCoverage(long linkId, long start, long end, long size)
+    {
+        using var c = Open();
+        using var tx = c.BeginTransaction(deferred: false);
+        string covered;
+        bool was;
+        using (var read = Command(c, "SELECT covered, complete FROM links WHERE id = $id", tx, new (string Name, object Value)[] { ("$id", linkId) }))
+        using (var r = read.ExecuteReader())
+        {
+            if (!r.Read())
+            {
+                return false;
+            }
+
+            covered = r.GetString(0);
+            was = r.GetInt64(1) == 1;
+        }
+
+        var ranges = ByteRanges.Add(ByteRanges.Parse(covered), start, end);
+        var now = was || ByteRanges.Covers(ranges, size);
+        Exec(c, "UPDATE links SET covered = $c, complete = $k WHERE id = $id", tx,
+            ("$c", ByteRanges.Serialize(ranges)), ("$k", now ? 1 : 0), ("$id", linkId));
+        tx.Commit();
+        return now && !was;
+    }
 
     public void AddUsage(Guid userId, long day, long bytes) =>
         Exec("""
@@ -240,7 +291,7 @@ public sealed class LinkStore
             UPDATE sessions SET status = 'abandoned'
             WHERE status IN ('in_progress', 'interrupted')
               AND link_id IN (SELECT l.id FROM links l JOIN batches b ON b.id = l.batch_id
-                              WHERE b.expires_at <= $n OR b.state = 'revoked');
+                              WHERE (b.expires_at <= $n OR b.state = 'revoked') AND l.complete = 0);
             """, ("$n", now));
 
     /// <summary>Folds sessions older than the cut-off into IP-free monthly totals, then deletes them and old batch addresses.</summary>
@@ -272,7 +323,7 @@ public sealed class LinkStore
         "SELECT id, user_id, created_at, expires_at, label, selection, state, blocked_reason, ip_limit_override, completed_notified FROM batches";
 
     private const string LinkSql =
-        "SELECT id, batch_id, item_id, media_source_id, file_name, size, kind, stream_index FROM links";
+        "SELECT id, batch_id, item_id, media_source_id, file_name, size, kind, stream_index, title, fallback, covered, complete FROM links";
 
     private const string SessionSql =
         "SELECT id, link_id, ip, user_agent, first_at, last_at, bytes_sent, ranges, status, new_ip FROM sessions";
@@ -284,7 +335,8 @@ public sealed class LinkStore
 
     private static LinkRecord ReadLink(SqliteDataReader r) => new(
         r.GetInt64(0), r.GetInt64(1), Guid.Parse(r.GetString(2)), r.GetString(3), r.GetString(4),
-        r.GetInt64(5), r.GetString(6), r.IsDBNull(7) ? null : r.GetInt32(7));
+        r.GetInt64(5), r.GetString(6), r.IsDBNull(7) ? null : r.GetInt32(7),
+        r.GetString(8), r.IsDBNull(9) ? null : r.GetString(9), r.GetString(10), r.GetInt64(11) == 1);
 
     private static SessionRecord ReadSession(SqliteDataReader r) => new(
         r.GetInt64(0), r.GetInt64(1), r.GetString(2), r.GetString(3), r.GetInt64(4), r.GetInt64(5),

@@ -104,17 +104,51 @@ public class LinkStoreTests
     }
 
     [Fact]
-    public void All_links_complete_needs_a_complete_session_per_link()
+    public void All_links_complete_needs_every_link_covered()
     {
         using var t = new TempStore();
         var id = t.Store.CreateBatch(User, 100, 200, "x", TempStore.AnySelection(Item),
             new[] { TempStore.Video(Item, "a.mkv", 10), TempStore.Video(Guid.NewGuid(), "b.mkv", 10) });
         var links = t.Store.GetLinks(id);
 
-        t.Store.InsertSession(new SessionRecord(0, links[0].Id, "1.1.1.1", "jd", 100, 100, 10, "0-9", SessionStatuses.Complete, true));
+        Assert.True(t.Store.AddCoverage(links[0].Id, 0, 9, 10));
         Assert.False(t.Store.AllLinksComplete(id));
-
-        t.Store.InsertSession(new SessionRecord(0, links[1].Id, "1.1.1.1", "jd", 100, 100, 10, "0-9", SessionStatuses.Complete, false));
+        Assert.False(t.Store.AddCoverage(links[1].Id, 0, 4, 10));
+        Assert.True(t.Store.AddCoverage(links[1].Id, 5, 9, 10));
+        Assert.False(t.Store.AddCoverage(links[1].Id, 0, 9, 10));
         Assert.True(t.Store.AllLinksComplete(id));
+        Assert.Equal("0-9", t.Store.GetLink(links[1].Id)!.Covered);
+    }
+
+    [Fact]
+    public void Migrating_a_v1_database_keeps_completed_links()
+    {
+        using var t = new TempStore(schema: 1);
+        using (var c = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={t.DbPath}"))
+        {
+            c.Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = """
+                INSERT INTO batches (id, user_id, created_at, expires_at, label, selection, state)
+                VALUES (1, '00000000-0000-0000-0000-000000000001', 0, 99, 'x', '{"RootItemIds":[],"AllVersions":false,"IncludeSubtitles":true,"ExcludedItemIds":[],"ExcludedMediaSourceIds":[]}', 'active');
+                INSERT INTO links (id, batch_id, item_id, media_source_id, file_name, size, kind) VALUES
+                  (1, 1, '00000000-0000-0000-0000-00000000000a', 'a', 'a.mkv', 10, 'video'),
+                  (2, 1, '00000000-0000-0000-0000-00000000000b', 'b', 'b.mkv', 10, 'video');
+                INSERT INTO sessions (link_id, ip, user_agent, first_at, last_at, bytes_sent, ranges, status, new_ip)
+                VALUES (1, '1.1.1.1', 'jd', 1, 1, 10, '0-9', 'complete', 1), (2, '1.1.1.1', 'jd', 1, 1, 4, '0-3', 'interrupted', 0);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        t.Store.Migrate();
+        t.Store.Migrate();
+
+        var a = t.Store.GetLink(1)!;
+        var b = t.Store.GetLink(2)!;
+        Assert.True(a.Complete);
+        Assert.Equal("0-9", a.Covered);
+        Assert.False(b.Complete);
+        Assert.Equal(string.Empty, b.Covered);
+        Assert.Equal(string.Empty, a.Title);
     }
 }

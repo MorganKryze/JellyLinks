@@ -34,7 +34,7 @@ public sealed record BatchRecord(
 
 public sealed record LinkRecord(
     long Id, long BatchId, Guid ItemId, string MediaSourceId, string FileName, long Size,
-    string Kind, int? StreamIndex);
+    string Kind, int? StreamIndex, string Title = "", string? Fallback = null, string Covered = "", bool Complete = false);
 
 public sealed record SessionRecord(
     long Id, long LinkId, string Ip, string UserAgent, long FirstAt, long LastAt,

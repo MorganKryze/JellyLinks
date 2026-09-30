@@ -8,10 +8,17 @@ public sealed class TempStore : IDisposable
 {
     public string DbPath { get; } = Path.Combine(Path.GetTempPath(), $"jellylinks-{Guid.NewGuid():N}.db");
 
-    public TempStore()
+    public TempStore(int? schema = null)
     {
         Store = new LinkStore(DbPath);
-        Store.Migrate();
+        if (schema is int version)
+        {
+            Store.Migrate(version);
+        }
+        else
+        {
+            Store.Migrate();
+        }
     }
 
     public LinkStore Store { get; }
