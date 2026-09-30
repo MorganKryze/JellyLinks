@@ -71,22 +71,26 @@ public sealed class FileGate
         }
 
         var found = location.File!;
-        if (found.ItemId != link.ItemId || found.StreamIndex != link.StreamIndex
-            || !string.Equals(found.MediaSourceId, link.MediaSourceId, StringComparison.OrdinalIgnoreCase))
+        long size;
+        try
         {
-            long size;
-            try
-            {
-                size = new FileInfo(found.Path).Length;
-            }
-            catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException)
-            {
-                return Deny(GateOutcome.Gone, link, batch); // vanished since Locate
-            }
+            size = new FileInfo(found.Path).Length;
+        }
+        catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return Deny(GateOutcome.Gone, link, batch); // vanished since Locate
+        }
 
+        var moved = found.ItemId != link.ItemId || found.StreamIndex != link.StreamIndex
+            || !string.Equals(found.MediaSourceId, link.MediaSourceId, StringComparison.OrdinalIgnoreCase);
+        if (moved || size != link.Size) // a file replaced in place keeps its id: only its size shows it
+        {
             _store.Relink(link.Id, found.ItemId, found.MediaSourceId, found.StreamIndex, size);
             link = _store.GetLink(link.Id)!;
-            await Publish(EventKind.LinkMoved, batch, $"{link.FileName} retrouvé après renommage").ConfigureAwait(false);
+            if (moved)
+            {
+                await Publish(EventKind.LinkMoved, batch, $"{link.FileName} retrouvé après renommage").ConfigureAwait(false);
+            }
         }
 
         var path = found.Path;

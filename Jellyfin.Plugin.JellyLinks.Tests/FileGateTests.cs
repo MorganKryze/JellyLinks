@@ -203,6 +203,20 @@ public sealed class FileGateTests : IDisposable
     }
 
     [Fact]
+    public async Task A_file_replaced_in_place_refreshes_the_link_size_and_resets_coverage()
+    {
+        _t.Store.AddCoverage(_link.Id, 0, 499, 1000); // half served against the size stored at creation
+        File.WriteAllBytes(_file, new byte[3000]); // same path, same item id: only the size tells
+        var r = await _gate.CheckAsync(Token(), "1.1.1.1", false);
+        Assert.Equal(GateOutcome.Serve, r.Outcome);
+        var stored = _t.Store.GetLink(_link.Id)!;
+        Assert.Equal(3000, stored.Size);
+        Assert.Equal(string.Empty, stored.Covered);
+        Assert.False(stored.Complete);
+        Assert.DoesNotContain(_sink.Events, e => e.Kind == EventKind.LinkMoved); // nothing was renamed
+    }
+
+    [Fact]
     public async Task An_ambiguous_rename_is_gone()
     {
         _lib.Path = null; // the gateway found zero or several candidates
