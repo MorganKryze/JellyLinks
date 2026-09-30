@@ -221,7 +221,11 @@ public sealed class LinkStore
             CultureInfo.InvariantCulture) == 1;
 
     /// <summary>Merges a served span into the link's coverage, all sessions together. True once: when the link becomes complete.</summary>
-    public bool AddCoverage(long linkId, long start, long end, long size)
+    public bool AddCoverage(long linkId, long start, long end, long size) =>
+        AddCoverage(linkId, new[] { (start, end) }, size);
+
+    /// <summary>Same, for several spans at once (a session's whole range set, so the link never lags behind its sessions).</summary>
+    public bool AddCoverage(long linkId, IReadOnlyList<(long Start, long End)> spans, long size)
     {
         using var c = Open();
         using var tx = c.BeginTransaction(deferred: false);
@@ -239,7 +243,12 @@ public sealed class LinkStore
             was = r.GetInt64(1) == 1;
         }
 
-        var ranges = ByteRanges.Add(ByteRanges.Parse(covered), start, end);
+        var ranges = ByteRanges.Parse(covered);
+        foreach (var (start, end) in spans)
+        {
+            ranges = ByteRanges.Add(ranges, start, end);
+        }
+
         var now = was || ByteRanges.Covers(ranges, size);
         Exec(c, "UPDATE links SET covered = $c, complete = $k WHERE id = $id", tx,
             ("$c", ByteRanges.Serialize(ranges)), ("$k", now ? 1 : 0), ("$id", linkId));

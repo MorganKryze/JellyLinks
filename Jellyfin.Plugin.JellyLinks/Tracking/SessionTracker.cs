@@ -49,7 +49,7 @@ public sealed class SessionTracker
             var stored = _store.GetSession(session.Id) ?? session;
             var ranges = ByteRanges.Add(ByteRanges.Parse(stored.Ranges), start, start + bytes - 1);
             // "terminé" is decided per link, across every session (a resume from another address counts).
-            var linkDone = _store.AddCoverage(link.Id, start, start + bytes - 1, link.Size);
+            var linkDone = _store.AddCoverage(link.Id, ranges, link.Size);
             var isComplete = stored.Status == SessionStatuses.Complete || linkDone || ByteRanges.Covers(ranges, link.Size);
 
             session = stored with

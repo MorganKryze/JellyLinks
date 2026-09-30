@@ -113,4 +113,21 @@ public class SessionTrackerTests
         Assert.Equal(SessionStatuses.Complete, t.Store.GetLatestSession(link.Id, "2.2.2.2")!.Status);
         Assert.Equal(SessionStatuses.InProgress, t.Store.GetLatestSession(link.Id, "1.1.1.1")!.Status);
     }
+
+    [Fact]
+    public void A_download_in_flight_at_upgrade_still_completes_the_link()
+    {
+        var (t, clock, tracker, link) = Setup();
+        using var __ = t;
+        var now = clock.GetUtcNow().ToUnixTimeSeconds();
+        t.Store.InsertSession(new SessionRecord(0, link.Id, "1.1.1.1", "jd", now, now, 600, "0-599", SessionStatuses.InProgress, true));
+
+        var session = tracker.Begin(link, "1.1.1.1", "jd", false);
+        Assert.Equal("0-599", session.Ranges);
+        Assert.True(tracker.Record(ref session, link, User, 600, 400));
+
+        var stored = t.Store.GetLink(link.Id)!;
+        Assert.True(stored.Complete);
+        Assert.Equal("0-999", stored.Covered);
+    }
 }
