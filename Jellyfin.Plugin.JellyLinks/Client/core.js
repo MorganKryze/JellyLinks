@@ -219,6 +219,22 @@
     document.head.appendChild(JL.el('style', { id: 'jlStyle', text: STYLE }));
   };
 
+  /**
+   * Runs fn once a Jellyfin action sheet has closed. The sheet closes with history.back(), whose popstate
+   * arrives after the item's click: a dialog opened before it would close on it. Falls back after `wait` ms.
+   */
+  JL.afterSheetClose = function (win, fn, wait) {
+    var done = false;
+    var run = function () {
+      if (done) { return; }
+      done = true;
+      win.removeEventListener('popstate', run);
+      fn();
+    };
+    win.addEventListener('popstate', run);
+    setTimeout(run, wait);
+  };
+
   var stack = [];
 
   /** A native-looking Jellyfin dialog (legacy dialog CSS exists on 10.11 and 12). Escape (topmost only), backdrop, ✕, back and route changes close it. */

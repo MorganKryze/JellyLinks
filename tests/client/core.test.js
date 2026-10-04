@@ -148,3 +148,24 @@ test('client scripts never use innerHTML', () => {
     assert.doesNotMatch(fs.readFileSync(path.join(dir, name), 'utf8'), /innerHTML|outerHTML|insertAdjacentHTML/, name);
   }
 });
+
+test('a menu entry opens once the menu has stepped back in history', async () => {
+  const win = new EventTarget();
+  let opened = 0;
+  JL.afterSheetClose(win, () => opened++, 50);
+  assert.equal(opened, 0);
+  win.dispatchEvent(new Event('popstate'));
+  assert.equal(opened, 1);
+  await new Promise((r) => setTimeout(r, 80));
+  assert.equal(opened, 1);
+});
+
+test('a menu entry still opens when the menu never steps back', async () => {
+  const win = new EventTarget();
+  let opened = 0;
+  JL.afterSheetClose(win, () => opened++, 20);
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(opened, 1);
+  win.dispatchEvent(new Event('popstate'));
+  assert.equal(opened, 1);
+});

@@ -109,7 +109,7 @@
       // Do not stop the event: the sheet closes itself and Jellyfin ignores the unknown id.
       b.addEventListener('click', function () {
         var ids2 = multi ? selectedIds() : [single];
-        if (ids2.length) { JL.openGenerate(ids2); }
+        if (ids2.length) { JL.afterSheetClose(window, function () { JL.openGenerate(ids2); }, 300); }
       });
       scroller.appendChild(b);
       keepInView(sheet);
