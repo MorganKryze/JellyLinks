@@ -33,28 +33,39 @@
 
   // ---- formats ---------------------------------------------------------------
 
+  /** The locale for numbers and dates: Jellyfin's regional variant of a shipped language ("en-gb"), else that language alone. */
+  function locale() {
+    var l = JL.lang(), t = String(tag()).replace(/_/g, '-');
+    return t.slice(0, 2).toLowerCase() === l ? t : l;
+  }
+
+  /** Runs an Intl formatting with the locale; a malformed tag falls back to English instead of throwing. */
+  function intl(fn) {
+    try { return fn(locale()); } catch (e) { return fn('en'); }
+  }
+
   JL.formatBytes = function (n) {
     var units = JL.raw('units') || ['B', 'KB', 'MB', 'GB', 'TB'], i = 0;
     while (n >= 1000 && i < units.length - 1) { n /= 1000; i++; }
-    return (i === 0 ? String(n) : n.toLocaleString(tag(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })) + ' ' + units[i];
+    return (i === 0 ? String(n) : intl(function (loc) { return n.toLocaleString(loc, { minimumFractionDigits: 1, maximumFractionDigits: 1 }); })) + ' ' + units[i];
   };
 
   JL.formatDate = function (unix) {
-    return new Date(unix * 1000).toLocaleDateString(tag(), { day: 'numeric', month: 'short', year: 'numeric' });
+    return intl(function (loc) { return new Date(unix * 1000).toLocaleDateString(loc, { day: 'numeric', month: 'short', year: 'numeric' }); });
   };
 
   JL.formatDay = function (unix) {
-    return new Date(unix * 1000).toLocaleDateString(tag(), { day: 'numeric', month: 'short' });
+    return intl(function (loc) { return new Date(unix * 1000).toLocaleDateString(loc, { day: 'numeric', month: 'short' }); });
   };
 
   JL.formatWhen = function (unix) {
-    return new Date(unix * 1000).toLocaleString(tag(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return intl(function (loc) { return new Date(unix * 1000).toLocaleString(loc, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); });
   };
 
   JL.formatDuration = function (s) {
     if (s < 60) { return s + ' s'; }
     if (s < 3600) { return Math.round(s / 60) + ' min'; }
-    return (s / 3600).toLocaleString(tag(), { maximumFractionDigits: 1 }) + ' h';
+    return intl(function (loc) { return (s / 3600).toLocaleString(loc, { maximumFractionDigits: 1 }); }) + ' h';
   };
 
   function pad2(n) { return n < 10 ? '0' + n : String(n); }

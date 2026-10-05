@@ -44,6 +44,15 @@ test('other languages fall back to English', () => {
   } finally { JL.setLang(null); }
 });
 
+test('formats never use a third language, and a bad tag does not throw', () => {
+  JL.setLang('de-de');
+  try { assert.equal(JL.formatDate(1791288000), 'Oct 6, 2026'); assert.equal(JL.formatBytes(1500), '1.5 KB'); } finally { JL.setLang(null); }
+  JL.setLang('en-gb');
+  try { assert.equal(JL.formatDate(1791288000), '6 Oct 2026'); } finally { JL.setLang(null); }
+  JL.setLang('x_bad');
+  try { assert.match(JL.formatBytes(1500), / KB$/); } finally { JL.setLang(null); }
+});
+
 test('plurals: French counts 0 and 1 as one, a missing key shows itself', () => {
   fr(() => { assert.equal(JL.t('ev.created', { n: 0 }), '0 fichier'); assert.equal(JL.t('ev.created', { n: 2 }), '2 fichiers'); });
   en(() => { assert.equal(JL.t('ev.created', { n: 0 }), '0 files'); assert.equal(JL.t('ev.created', { n: 1 }), '1 file'); });
