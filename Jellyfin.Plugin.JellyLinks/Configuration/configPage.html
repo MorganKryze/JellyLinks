@@ -268,7 +268,7 @@
     return opts.onClick ? el('button', { type: 'button', className: cls, on: { click: opts.onClick } }, kids) : el('div', { className: cls }, kids);
   }
 
-  function openBatches(state) { $('jl-b-state').value = state; selectTab('batches'); }
+  function openBatches(state) { $('jl-b-q').value = ''; $('jl-b-user').value = ''; $('jl-b-days').value = '0'; $('jl-b-state').value = state; selectTab('batches'); }
 
   function svg(tag, attrs) {
     var e = document.createElementNS(NS, tag);
@@ -317,7 +317,7 @@
     var tip = el('div', { className: 'jlTip', hidden: true });
     var pinned = null;
     function showTip(d0, list, x) {
-      tip.replaceChildren.apply(tip, [el('b', { text: JL.formatDate(d0 * 86400) })].concat(list.map(function (p) {
+      tip.replaceChildren.apply(tip, [el('b', { text: JL.formatDate(d0 * 86400 + 43200) })].concat(list.map(function (p) {
         var sw = el('span', { className: 'jlSwatch' });
         sw.style.background = p.color;
         return el('div', null, [sw, p.label + ' · ' + JL.formatBytes(p.bytes)]);
@@ -329,7 +329,7 @@
     for (var i = 0; i < span; i++) {
       (function (i) {
         var d0 = first + i, x = padL + i * bw, list = parts(d0), y = padT + plotH;
-        var g = svg('g', { tabindex: '0', 'class': 'jlDay', 'aria-label': JL.formatDate(d0 * 86400) + ' · ' + JL.formatBytes(sum(list)) });
+        var g = svg('g', { tabindex: '0', 'class': 'jlDay', 'aria-label': JL.formatDate(d0 * 86400 + 43200) + ' · ' + JL.formatBytes(sum(list)) });
         g.appendChild(svg('rect', { x: String(x), y: String(padT), width: String(bw), height: String(plotH), fill: 'transparent' }));
         list.forEach(function (p) {
           var h = (p.bytes / max) * plotH;
@@ -347,7 +347,7 @@
         if ((span - 1 - i) % 7 === 0) {
           var last = i === span - 1;
           var lab = svg('text', { x: String(last ? width : x + bw / 2), y: String(H - 6), 'text-anchor': last ? 'end' : 'middle' });
-          lab.textContent = last ? t('chart.today') : JL.formatDay(d0 * 86400);
+          lab.textContent = last ? t('chart.today') : JL.formatDay(d0 * 86400 + 43200);
           chartSvg.appendChild(lab);
         }
       })(i);
@@ -361,7 +361,7 @@
     })) : null;
     var srRows = [];
     for (day = first; day <= today; day++) {
-      parts(day).forEach(function (p) { srRows.push(el('tr', null, [el('td', { text: JL.formatDate(day * 86400) }), el('td', { text: p.label }), el('td', { text: JL.formatBytes(p.bytes) })])); });
+      parts(day).forEach(function (p) { srRows.push(el('tr', null, [el('td', { text: JL.formatDate(day * 86400 + 43200) }), el('td', { text: p.label }), el('td', { text: JL.formatBytes(p.bytes) })])); });
     }
     var sr = el('table', { className: 'jlSr' }, [el('caption', { text: t('chart.label') }), el('tbody', null, srRows)]);
     box.replaceChildren.apply(box, [chartSvg, tip, legend, sr].filter(Boolean));
