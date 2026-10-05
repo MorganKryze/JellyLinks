@@ -1,5 +1,6 @@
 using Jellyfin.Plugin.JellyLinks.Configuration;
 using Jellyfin.Plugin.JellyLinks.Data;
+using Jellyfin.Plugin.JellyLinks.I18n;
 using Jellyfin.Plugin.JellyLinks.Library;
 using Jellyfin.Plugin.JellyLinks.Notify;
 using Jellyfin.Plugin.JellyLinks.Signing;
@@ -89,7 +90,7 @@ public sealed class FileGate
             link = _store.GetLink(link.Id)!;
             if (moved)
             {
-                await Publish(EventKind.LinkMoved, batch, $"{link.FileName} retrouvé après renommage").ConfigureAwait(false);
+                await Publish(EventKind.LinkMoved, batch, Msg.Of("moved", ("file", link.FileName))).ConfigureAwait(false);
             }
         }
 
@@ -105,10 +106,10 @@ public sealed class FileGate
         var ipCheck = _store.AdmitIp(batch.Id, ip, limit, now);
         if (ipCheck.OverLimit)
         {
-            var reason = $"{ipCheck.Distinct} adresses distinctes (limite {limit})";
-            if (_store.BlockIfActive(batch.Id, reason)) // stored: no address, it would outlive retention
+            var reason = Msg.Of("ip_limit", ("n", ipCheck.Distinct), ("limit", limit));
+            if (_store.BlockIfActive(batch.Id, reason.Serialize())) // stored: no address, it would outlive retention
             {
-                await Publish(EventKind.BatchBlocked, batch, $"{reason}, dernière : {ip}").ConfigureAwait(false);
+                await Publish(EventKind.BatchBlocked, batch, Msg.Of("blocked", ("n", ipCheck.Distinct), ("limit", limit), ("ip", ip))).ConfigureAwait(false);
             }
 
             return Deny(GateOutcome.Forbidden, link, batch);
@@ -116,14 +117,14 @@ public sealed class FileGate
 
         if (ipCheck.IsNew)
         {
-            await Publish(EventKind.NewIp, batch, $"adresse {ip} ({ipCheck.Distinct}/{(limit > 0 ? limit : "∞")})").ConfigureAwait(false);
+            await Publish(EventKind.NewIp, batch, Msg.Of("new_ip", ("ip", ip), ("n", ipCheck.Distinct), ("limit", limit))).ConfigureAwait(false);
         }
 
         // 7. quota
         var q = _quotas.GetStatus(batch.UserId);
         if (q.VolumeExhausted)
         {
-            await Publish(EventKind.QuotaReached, batch, $"{q.UsedBytes} octets sur {q.Quota.VolumeBytes} ({q.Quota.PeriodDays} j)").ConfigureAwait(false);
+            await Publish(EventKind.QuotaReached, batch, Msg.Of("quota", ("usedBytes", q.UsedBytes), ("volumeBytes", q.Quota.VolumeBytes), ("n", q.Quota.PeriodDays))).ConfigureAwait(false);
             return Deny(GateOutcome.TooManyRequests, link, batch);
         }
 
@@ -132,6 +133,6 @@ public sealed class FileGate
 
     private static GateResult Deny(GateOutcome o, LinkRecord? l = null, BatchRecord? b = null) => new(o, l, b, null, false);
 
-    private Task Publish(EventKind kind, BatchRecord batch, string detail) =>
+    private Task Publish(EventKind kind, BatchRecord batch, Msg detail) =>
         _notifier.PublishAsync(new LinkEvent(kind, batch.UserId, _library.UserName(batch.UserId), batch.Label, batch.Id, detail));
 }

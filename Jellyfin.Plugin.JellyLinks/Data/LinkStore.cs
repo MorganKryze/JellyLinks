@@ -343,6 +343,10 @@ public sealed partial class LinkStore
         Convert.ToInt64(Scalar("SELECT COALESCE(SUM(bytes), 0) FROM usage WHERE user_id = $u AND day >= $d;",
             ("$u", userId.ToString()), ("$d", fromDay)), CultureInfo.InvariantCulture);
 
+    /// <summary>The first day with usage in the window: when it leaves the window, its bytes free up.</summary>
+    public long? FirstUsageDay(Guid userId, long fromDay) =>
+        Scalar("SELECT MIN(day) FROM usage WHERE user_id = $u AND day >= $d AND bytes > 0;", ("$u", userId.ToString()), ("$d", fromDay)) is long d ? d : null;
+
     public int CountActiveBatches(Guid userId, long now) =>
         Convert.ToInt32(Scalar("SELECT COUNT(*) FROM batches WHERE user_id = $u AND state = 'active' AND expires_at > $n;",
             ("$u", userId.ToString()), ("$n", now)), CultureInfo.InvariantCulture);

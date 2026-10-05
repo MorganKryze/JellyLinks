@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Jellyfin.Plugin.JellyLinks.Configuration;
 using Jellyfin.Plugin.JellyLinks.Data;
+using Jellyfin.Plugin.JellyLinks.I18n;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.JellyLinks.Notify;
@@ -16,12 +17,13 @@ public sealed class Notifier
     private readonly ILogger<Notifier> _log;
     private readonly LinkStore? _journal;
     private readonly TimeProvider _clock;
+    private readonly ServerLanguage _language;
 
     // in memory: a restart may let one extra "quota reached" alert through
     private readonly ConcurrentDictionary<Guid, long> _quotaNotified = new();
 
     public Notifier(IActivitySink sink, IHttpClientFactory http, Func<PluginConfiguration> config, ILogger<Notifier> log,
-                    LinkStore? journal = null, TimeProvider? clock = null)
+                    LinkStore? journal = null, TimeProvider? clock = null, ServerLanguage? language = null)
     {
         _sink = sink;
         _http = http;
@@ -29,6 +31,7 @@ public sealed class Notifier
         _log = log;
         _journal = journal;
         _clock = clock ?? TimeProvider.System;
+        _language = language ?? new ServerLanguage(() => null);
     }
 
     public async Task PublishAsync(LinkEvent e)
@@ -46,7 +49,7 @@ public sealed class Notifier
 
         try
         {
-            _journal?.AddEvent(now, e.Kind.ToString(), e.UserId, e.BatchId == 0 ? null : e.BatchId, e.Detail);
+            _journal?.AddEvent(now, e.Kind.ToString(), e.UserId, e.BatchId == 0 ? null : e.BatchId, e.Detail.Serialize());
         }
         catch (Exception ex)
         {
@@ -60,7 +63,7 @@ public sealed class Notifier
 
         try
         {
-            await _sink.WriteAsync(e).ConfigureAwait(false);
+            await _sink.WriteAsync(e, _language.Current).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -68,41 +71,41 @@ public sealed class Notifier
         }
 
         // fire-and-forget: a slow webhook must never delay a download
-        _ = SendWebhookAsync(e);
+        _ = SendWebhookAsync(e, _language.Current);
     }
 
-    /// <summary>Sends a sample alert with the given address and format, and says what happened (the "tester" button).</summary>
-    public async Task<(bool Ok, string Message)> TestWebhookAsync(string url, string format)
+    /// <summary>Sends a sample alert with the given address and format, and says what happened (the "test" button).</summary>
+    public async Task<(bool Ok, Msg Result)> TestWebhookAsync(string url, string format)
     {
+        var lang = _language.Current;
         var probe = new PluginConfiguration { WebhookUrl = url, WebhookFormat = format, NotifyBatchBlocked = true };
-        var e = new LinkEvent(EventKind.BatchBlocked, Guid.Empty, "test", "JellyLinks — essai", 0,
-            "Message d'essai envoyé depuis le panneau d'administration.");
+        var e = new LinkEvent(EventKind.BatchBlocked, Guid.Empty, "test", Strings.T(lang, "hook.testLabel"), 0, Msg.Of("hook_test"));
         try
         {
-            using var req = WebhookFormatter.Build(probe, e);
+            using var req = WebhookFormatter.Build(probe, e, lang);
             if (req is null)
             {
-                return (false, "Aucune adresse de webhook.");
+                return (false, Msg.Of("no_url"));
             }
 
             using var client = _http.CreateClient("JellyLinks");
             client.Timeout = TimeSpan.FromSeconds(10);
             using var res = await client.SendAsync(req).ConfigureAwait(false);
             return res.IsSuccessStatusCode
-                ? (true, $"Envoyé : réponse {(int)res.StatusCode}.")
-                : (false, $"Le webhook a répondu {(int)res.StatusCode}.");
+                ? (true, Msg.Of("sent", ("status", (int)res.StatusCode)))
+                : (false, Msg.Of("http", ("status", (int)res.StatusCode)));
         }
         catch (Exception ex)
         {
-            return (false, "Échec : " + ex.Message);
+            return (false, Msg.Of("failed", ("error", ex.Message)));
         }
     }
 
-    private async Task SendWebhookAsync(LinkEvent e)
+    private async Task SendWebhookAsync(LinkEvent e, string lang)
     {
         try
         {
-            using var req = WebhookFormatter.Build(_config(), e);
+            using var req = WebhookFormatter.Build(_config(), e, lang);
             if (req is null)
             {
                 return;

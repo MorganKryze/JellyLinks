@@ -1,5 +1,6 @@
 using Jellyfin.Plugin.JellyLinks.Configuration;
 using Jellyfin.Plugin.JellyLinks.Data;
+using Jellyfin.Plugin.JellyLinks.I18n;
 using Jellyfin.Plugin.JellyLinks.Library;
 using Jellyfin.Plugin.JellyLinks.Notify;
 using Jellyfin.Plugin.JellyLinks.Policy;
@@ -17,11 +18,13 @@ public sealed record NamedTop(string Name, long Bytes);
 public sealed record OverviewView(OverviewStats Stats, IReadOnlyList<DayVolume> Days, IReadOnlyDictionary<string, string> UserNames,
     IReadOnlyList<NamedTop> TopTitles, IReadOnlyList<NamedTop> TopUsers);
 
-public sealed record AdminBatch(BatchRow Batch, string UserName);
+public sealed record AdminBatch(BatchRow Batch, string UserName, Msg? Reason);
 
-public sealed record AdminBatchDetail(BatchRow Batch, string UserName, int IpLimit, IReadOnlyList<SessionRow> Sessions, IReadOnlyList<EventRow> Events);
+public sealed record EventView(long At, string Kind, Msg Detail);
 
-public sealed record ActivityEntry(long At, string Kind, Guid UserId, string UserName, long? BatchId, string? BatchLabel, BatchScope? BatchScope, string Detail);
+public sealed record AdminBatchDetail(BatchRow Batch, string UserName, Msg? Reason, int IpLimit, IReadOnlyList<SessionRow> Sessions, IReadOnlyList<EventView> Events);
+
+public sealed record ActivityEntry(long At, string Kind, Guid UserId, string UserName, long? BatchId, string? BatchLabel, BatchScope? BatchScope, Msg Detail);
 
 public sealed record AdminUser(Guid Id, string Name, bool CanDownload, bool IsAdmin, bool HasOverride, EffectiveQuota Quota,
     long UsedBytes, int ActiveBatches, long ArchivedBytes, int ArchivedCompleted);
@@ -30,7 +33,7 @@ public sealed record QuotaOverrideBody(long VolumeBytes, int PeriodDays, int Max
 
 public sealed record WebhookTestBody(string Url, string Format);
 
-public sealed record WebhookTestResult(bool Ok, string Message);
+public sealed record WebhookTestResult(bool Ok, Msg Result);
 
 public sealed record RevokeAllResult(int Revoked);
 
@@ -46,9 +49,10 @@ public sealed class AdminController : ControllerBase
     private readonly Func<PluginConfiguration> _config;
     private readonly TimeProvider _clock;
     private readonly SigningKey _key;
+    private readonly ServerLanguage _language;
 
     public AdminController(LinkStore store, ILibraryGateway library, QuotaService quotas, Notifier notifier,
-                           Func<PluginConfiguration> config, TimeProvider clock, SigningKey key)
+                           Func<PluginConfiguration> config, TimeProvider clock, SigningKey key, ServerLanguage language)
     {
         _store = store;
         _library = library;
@@ -57,6 +61,7 @@ public sealed class AdminController : ControllerBase
         _config = config;
         _clock = clock;
         _key = key;
+        _language = language;
     }
 
     private long Now => _clock.GetUtcNow().ToUnixTimeSeconds();
@@ -65,7 +70,9 @@ public sealed class AdminController : ControllerBase
 
     private static BatchRow Shown(BatchRow b) => b with { Label = BatchScope.Display(b.Label, b.Scope) };
 
-    private static string NameOf(Dictionary<Guid, string> names, Guid id) => names.TryGetValue(id, out var n) ? n : id == Guid.Empty ? "administrateur" : id.ToString("N");
+    private string NameOf(Dictionary<Guid, string> names, Guid id) => names.TryGetValue(id, out var n) ? n : id == Guid.Empty ? Strings.T(_language.Current, "user.admin") : id.ToString("N");
+
+    private static Msg? ReasonOf(BatchRow b) => b.BlockedReason is null ? null : Msg.Parse(b.BlockedReason);
 
     private IReadOnlyList<Guid>? UsersMatching(string? text, Dictionary<Guid, string> names) =>
         string.IsNullOrWhiteSpace(text) ? null
@@ -93,7 +100,7 @@ public sealed class AdminController : ControllerBase
     {
         var names = Names();
         return _store.SearchBatches(new BatchQuery(q, UsersMatching(q, names), string.IsNullOrEmpty(state) ? null : state, user, Since(days)), Now)
-            .Select(b => new AdminBatch(Shown(b), NameOf(names, b.UserId))).ToList();
+            .Select(b => new AdminBatch(Shown(b), NameOf(names, b.UserId), ReasonOf(b))).ToList();
     }
 
     [HttpGet("batches/{id:long}")]
@@ -105,8 +112,9 @@ public sealed class AdminController : ControllerBase
             return NotFound();
         }
 
-        var events = _store.ListEvents(new EventQuery(null, null, null, null, null, 1000)).Where(e => e.BatchId == id).ToList();
-        return new AdminBatchDetail(Shown(row), NameOf(Names(), row.UserId), row.IpLimitOverride ?? _config().IpLimit, _store.SessionsOfBatch(id), events);
+        var events = _store.ListEvents(new EventQuery(null, null, null, null, null, 1000)).Where(e => e.BatchId == id)
+            .Select(e => new EventView(e.At, e.Kind, Msg.Parse(e.Detail))).ToList();
+        return new AdminBatchDetail(Shown(row), NameOf(Names(), row.UserId), ReasonOf(row), row.IpLimitOverride ?? _config().IpLimit, _store.SessionsOfBatch(id), events);
     }
 
     [HttpGet("batches/{id:long}/links")]
@@ -149,10 +157,10 @@ public sealed class AdminController : ControllerBase
 
         if (!_store.Unblock(id, limit))
         {
-            return Conflict("not blocked");
+            return Conflict(Msg.Of("conflict"));
         }
 
-        var detail = "débloqué par l'administrateur" + (limit is int l ? $", limite relevée à {l}" : string.Empty);
+        var detail = limit is int l ? Msg.Of("unblocked_raised", ("limit", l)) : Msg.Of("unblocked");
 
         _ = _notifier.PublishAsync(new LinkEvent(EventKind.BatchUnblocked, b.UserId, _library.UserName(b.UserId), b.Label, id, detail));
         return NoContent();
@@ -169,8 +177,8 @@ public sealed class AdminController : ControllerBase
 
         if (BatchStates.Effective(b.State, b.ExpiresAt, Now) is BatchStates.Active or BatchStates.Blocked)
         {
-            _store.SetBatchState(id, BatchStates.Revoked, "révoqué par l'administrateur");
-            _ = _notifier.PublishAsync(new LinkEvent(EventKind.BatchRevoked, b.UserId, _library.UserName(b.UserId), b.Label, id, "révoqué par l'administrateur"));
+            _store.SetBatchState(id, BatchStates.Revoked, Msg.Of("revoked_admin").Serialize());
+            _ = _notifier.PublishAsync(new LinkEvent(EventKind.BatchRevoked, b.UserId, _library.UserName(b.UserId), b.Label, id, Msg.Of("revoked_admin")));
         }
 
         return NoContent();
@@ -197,12 +205,15 @@ public sealed class AdminController : ControllerBase
                     continue;
                 }
 
-                var detail = $"{s.FileName} · {s.Ip} · {s.UserAgent} · {s.CoveredBytes}/{s.Size} o · {s.Status}";
-                if (string.IsNullOrWhiteSpace(q) || detail.Contains(q.Trim(), StringComparison.CurrentCultureIgnoreCase)
+                var detail = Msg.Of("session", ("file", s.FileName), ("ip", s.Ip), ("ua", s.UserAgent),
+                    ("coveredBytes", s.CoveredBytes), ("sizeBytes", s.Size), ("status", s.Status));
+                var haystack = $"{s.FileName} {s.Ip} {s.UserAgent} {s.Status}";
+                if (string.IsNullOrWhiteSpace(q) || haystack.Contains(q.Trim(), StringComparison.CurrentCultureIgnoreCase)
                     || b.Label.Contains(q.Trim(), StringComparison.CurrentCultureIgnoreCase)
                     || NameOf(names, b.UserId).Contains(q.Trim(), StringComparison.CurrentCultureIgnoreCase))
                 {
-                    entries.Add(new ActivityEntry(s.LastAt, "Session", b.UserId, NameOf(names, b.UserId), b.Id, BatchScope.Display(b.Label, b.Scope), b.Scope, detail));
+                    entries.Add(new ActivityEntry(s.LastAt, "Session", b.UserId, NameOf(names, b.UserId), b.Id,
+                        BatchScope.Display(b.Label, b.Scope), b.Scope, detail));
                 }
             }
         }
@@ -210,7 +221,7 @@ public sealed class AdminController : ControllerBase
         if (kind != "Session")
         {
             entries.AddRange(_store.ListEvents(new EventQuery(q, string.IsNullOrEmpty(kind) ? null : kind, user, since, UsersMatching(q, names)))
-                .Select(e => new ActivityEntry(e.At, e.Kind, e.UserId, NameOf(names, e.UserId), e.BatchId, e.BatchLabel is null ? null : BatchScope.Display(e.BatchLabel, e.BatchScope), e.BatchScope, e.Detail)));
+                .Select(e => new ActivityEntry(e.At, e.Kind, e.UserId, NameOf(names, e.UserId), e.BatchId, e.BatchLabel is null ? null : BatchScope.Display(e.BatchLabel, e.BatchScope), e.BatchScope, Msg.Parse(e.Detail))));
         }
 
         return entries.OrderByDescending(e => e.At).Take(500).ToList();
@@ -232,9 +243,13 @@ public sealed class AdminController : ControllerBase
     [HttpPut("users/{id:guid}/quota")]
     public IActionResult SetQuota(Guid id, [FromBody] QuotaOverrideBody body)
     {
-        if (body.VolumeBytes < 0 || body.PeriodDays is < 1 or > 365 || body.MaxActiveBatches is < 0 or > 1000)
+        var errors = new List<FieldError>();
+        if (body.VolumeBytes < 0) { errors.Add(new(nameof(body.VolumeBytes), Msg.Of("min", ("min", 0)))); }
+        if (body.PeriodDays is < 1 or > 365) { errors.Add(new(nameof(body.PeriodDays), Msg.Of("range", ("min", 1), ("max", 365)))); }
+        if (body.MaxActiveBatches is < 0 or > 1000) { errors.Add(new(nameof(body.MaxActiveBatches), Msg.Of("range", ("min", 0), ("max", 1000)))); }
+        if (errors.Count > 0)
         {
-            return BadRequest(new[] { "Exception de quota : volume ≥ 0, période entre 1 et 365 jours, lots actifs entre 0 et 1000." });
+            return BadRequest(errors);
         }
 
         _store.SetQuotaOverride(new QuotaOverride(id, body.VolumeBytes, body.PeriodDays, body.MaxActiveBatches), id);
@@ -269,17 +284,17 @@ public sealed class AdminController : ControllerBase
     [HttpPost("settings/test-webhook")]
     public async Task<ActionResult<WebhookTestResult>> TestWebhook([FromBody] WebhookTestBody body)
     {
-        var (ok, message) = await _notifier.TestWebhookAsync(body.Url, body.Format).ConfigureAwait(false);
-        return new WebhookTestResult(ok, message);
+        var (ok, result) = await _notifier.TestWebhookAsync(body.Url, body.Format).ConfigureAwait(false);
+        return new WebhookTestResult(ok, result);
     }
 
     /// <summary>"Tout révoquer": every open batch is revoked (that is what kills the links); the new signing secret protects against a leaked one.</summary>
     [HttpPost("revoke-all")]
     public ActionResult<RevokeAllResult> RevokeAll()
     {
-        var n = _store.RevokeAll("tout révoqué par l'administrateur", Now);
+        var n = _store.RevokeAll(Msg.Of("all_revoked").Serialize(), Now);
         _key.Rotate();
-        _ = _notifier.PublishAsync(new LinkEvent(EventKind.AllRevoked, Guid.Empty, "admin", string.Empty, 0, $"{n} lots révoqués, secret renouvelé"));
+        _ = _notifier.PublishAsync(new LinkEvent(EventKind.AllRevoked, Guid.Empty, Strings.T(_language.Current, "user.admin"), string.Empty, 0, Msg.Of("all_revoked", ("n", n))));
         return new RevokeAllResult(n);
     }
 }

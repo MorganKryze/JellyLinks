@@ -1,4 +1,5 @@
 using Jellyfin.Plugin.JellyLinks.Configuration;
+using Jellyfin.Plugin.JellyLinks.I18n;
 
 namespace Jellyfin.Plugin.JellyLinks.Api;
 
@@ -8,6 +9,8 @@ public sealed record SettingsView(
     int RetentionDays, string WebhookUrl, string WebhookFormat, bool NotifyBatchBlocked, bool NotifyNewIp, bool NotifyQuotaReached,
     bool NotifyBatchCompleted, string PublicBaseUrl);
 
+public sealed record FieldError(string Field, Msg Error);
+
 public static class SettingsRules
 {
     public static SettingsView From(PluginConfiguration c) => new(
@@ -15,45 +18,49 @@ public static class SettingsRules
         c.RetentionDays, c.WebhookUrl, c.WebhookFormat, c.NotifyBatchBlocked, c.NotifyNewIp, c.NotifyQuotaReached,
         c.NotifyBatchCompleted, c.PublicBaseUrl);
 
-    public static IReadOnlyList<string> Validate(SettingsView s)
+    public static IReadOnlyList<FieldError> Validate(SettingsView s)
     {
-        var errors = new List<string>();
-        void Range(int v, int min, int max, string what)
+        var missing = new List<FieldError>();
+        if (s.WebhookUrl is null) { missing.Add(new(nameof(SettingsView.WebhookUrl), Msg.Of("required"))); }
+        if (s.WebhookFormat is null) { missing.Add(new(nameof(SettingsView.WebhookFormat), Msg.Of("required"))); }
+        if (s.PublicBaseUrl is null) { missing.Add(new(nameof(SettingsView.PublicBaseUrl), Msg.Of("required"))); }
+        if (missing.Count > 0)
+        {
+            return missing;
+        }
+
+        var errors = new List<FieldError>();
+        void Range(int v, int min, int max, string field)
         {
             if (v < min || v > max)
             {
-                errors.Add($"{what} : entre {min} et {max}.");
+                errors.Add(new FieldError(field, Msg.Of("range", ("min", min), ("max", max))));
             }
         }
 
-        Range(s.LinkValidityDays, 1, 365, "Validité (jours)");
-        Range(s.IpLimit, 0, 100, "Limite d'adresses (0 = sans limite)");
-        Range(s.QuotaPeriodDays, 1, 365, "Période du quota (jours)");
-        Range(s.QuotaMaxActiveBatches, 0, 1000, "Lots actifs maximum (0 = illimité)");
-        Range(s.RetentionDays, 7, 3650, "Rétention (jours)");
+        Range(s.LinkValidityDays, 1, 365, nameof(SettingsView.LinkValidityDays));
+        Range(s.IpLimit, 0, 100, nameof(SettingsView.IpLimit));
+        Range(s.QuotaPeriodDays, 1, 365, nameof(SettingsView.QuotaPeriodDays));
+        Range(s.QuotaMaxActiveBatches, 0, 1000, nameof(SettingsView.QuotaMaxActiveBatches));
+        Range(s.RetentionDays, 7, 3650, nameof(SettingsView.RetentionDays));
         if (s.QuotaVolumeBytes < 0)
         {
-            errors.Add("Volume du quota : positif ou nul (0 = illimité).");
-        }
-
-        if (s.WebhookUrl is null || s.PublicBaseUrl is null || s.WebhookFormat is null)
-        {
-            return new[] { "Réglages incomplets : adresse du webhook, format et adresse publique sont requis." };
+            errors.Add(new FieldError(nameof(SettingsView.QuotaVolumeBytes), Msg.Of("min", ("min", 0))));
         }
 
         if (s.WebhookFormat is not ("ntfy" or "json"))
         {
-            errors.Add("Format du webhook : ntfy ou json.");
+            errors.Add(new FieldError(nameof(SettingsView.WebhookFormat), Msg.Of("format")));
         }
 
         if (!string.IsNullOrWhiteSpace(s.WebhookUrl) && !IsHttpUrl(s.WebhookUrl, plain: false))
         {
-            errors.Add("Adresse du webhook : une URL http ou https.");
+            errors.Add(new FieldError(nameof(SettingsView.WebhookUrl), Msg.Of("url")));
         }
 
         if (!string.IsNullOrWhiteSpace(s.PublicBaseUrl) && !IsHttpUrl(s.PublicBaseUrl, plain: true))
         {
-            errors.Add("Adresse publique : une URL http ou https sans identifiants, paramètres ni ancre (ex. https://jellyfin.example).");
+            errors.Add(new FieldError(nameof(SettingsView.PublicBaseUrl), Msg.Of("plainUrl")));
         }
 
         return errors;

@@ -57,4 +57,18 @@ public class QuotaServiceTests
         Assert.False(q.VolumeExhausted);
         Assert.False(q.BatchesExhausted);
     }
+
+    [Fact]
+    public void An_exhausted_quota_says_when_space_frees_up()
+    {
+        using var t = new TempStore();
+        var cfg = new PluginConfiguration { QuotaEnabled = true, QuotaVolumeBytes = 1000, QuotaPeriodDays = 7 };
+        t.Store.AddUsage(User, 100 - 6, 0);
+        t.Store.AddUsage(User, 100 - 5, 600);
+        t.Store.AddUsage(User, 100, 600);
+        var svc = new QuotaService(t.Store, () => cfg, Clock);
+
+        Assert.Equal(86_400L * (100 - 5 + 7), svc.FreesAt(User, svc.GetStatus(User)));
+        Assert.Null(svc.FreesAt(User, new QuotaService(t.Store, () => new PluginConfiguration(), Clock).GetStatus(User)));
+    }
 }

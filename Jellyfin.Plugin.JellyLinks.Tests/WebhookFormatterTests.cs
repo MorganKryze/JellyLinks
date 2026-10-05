@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using Jellyfin.Plugin.JellyLinks.Configuration;
+using Jellyfin.Plugin.JellyLinks.I18n;
 using Jellyfin.Plugin.JellyLinks.Notify;
 using Xunit;
 
@@ -10,42 +11,51 @@ namespace JellyLinks.Tests;
 public class WebhookFormatterTests
 {
     private static readonly LinkEvent Blocked =
-        new(EventKind.BatchBlocked, Guid.Empty, "julien", "Severance — Saison 1", 7, "4 adresses distinctes (limite 3)");
+        new(EventKind.BatchBlocked, Guid.Empty, "julien", "Severance · Saison 1", 7, Msg.Of("blocked", ("n", 4), ("limit", 3), ("ip", "4.4.4.4")));
 
     [Fact]
     public void No_url_means_no_request()
     {
-        Assert.Null(WebhookFormatter.Build(new PluginConfiguration(), Blocked));
+        Assert.Null(WebhookFormatter.Build(new PluginConfiguration(), Blocked, "fr"));
     }
 
     [Fact]
     public void Unticked_event_means_no_request()
     {
         var c = new PluginConfiguration { WebhookUrl = "https://ntfy.example/topic", NotifyBatchBlocked = false };
-        Assert.Null(WebhookFormatter.Build(c, Blocked));
+        Assert.Null(WebhookFormatter.Build(c, Blocked, "fr"));
     }
 
     [Fact]
     public async Task Ntfy_format_is_readable_text_with_title_and_tags()
     {
         var c = new PluginConfiguration { WebhookUrl = "https://ntfy.example/topic", WebhookFormat = "ntfy" };
-        var req = WebhookFormatter.Build(c, Blocked)!;
+        var req = WebhookFormatter.Build(c, Blocked, "fr")!;
         Assert.Equal(HttpMethod.Post, req.Method);
         Assert.All(req.Headers.SelectMany(h => h.Value), v => Assert.True(Ascii.IsValid(v), v));
-        Assert.Equal("JellyLinks : lot bloqué", DecodeRfc2047(req.Headers.GetValues("Title").Single()));
+        Assert.Equal("JellyLinks : Lot bloqué", DecodeRfc2047(req.Headers.GetValues("Title").Single()));
         Assert.Contains("warning", req.Headers.GetValues("Tags").Single());
         var body = await req.Content!.ReadAsStringAsync();
         Assert.Contains("julien", body);
-        Assert.Contains("Severance — Saison 1", body);
+        Assert.Contains("Severance · Saison 1", body);
+        Assert.Contains("4 adresses distinctes (limite 3), dernière : 4.4.4.4", body);
     }
 
     [Fact]
     public async Task Json_format_carries_the_structured_event()
     {
         var c = new PluginConfiguration { WebhookUrl = "https://hooks.example/x", WebhookFormat = "json" };
-        var body = await WebhookFormatter.Build(c, Blocked)!.Content!.ReadAsStringAsync();
+        var body = await WebhookFormatter.Build(c, Blocked, "fr")!.Content!.ReadAsStringAsync();
         Assert.Contains("\"kind\":\"BatchBlocked\"", body);
         Assert.Contains("\"batchId\":7", body);
+        Assert.Contains("\"detailCode\":\"blocked\"", body);
+    }
+
+    [Fact]
+    public void English_server_gets_english_titles()
+    {
+        var c = new PluginConfiguration { WebhookUrl = "https://ntfy.example/topic", WebhookFormat = "ntfy" };
+        Assert.Equal("JellyLinks: Batch blocked", WebhookFormatter.Build(c, Blocked, "en")!.Headers.GetValues("Title").Single());
     }
 
     [Fact]
@@ -78,7 +88,7 @@ public class WebhookFormatterTests
         try
         {
             var c = new PluginConfiguration { WebhookUrl = $"http://127.0.0.1:{port}/topic", WebhookFormat = "ntfy" };
-            using var req = WebhookFormatter.Build(c, Blocked)!;
+            using var req = WebhookFormatter.Build(c, Blocked, "fr")!;
             using var client = new HttpClient();
             using var res = await client.SendAsync(req);
             Assert.True(res.IsSuccessStatusCode);

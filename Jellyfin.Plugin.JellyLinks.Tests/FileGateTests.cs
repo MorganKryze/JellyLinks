@@ -1,5 +1,6 @@
 using Jellyfin.Plugin.JellyLinks.Configuration;
 using Jellyfin.Plugin.JellyLinks.Data;
+using Jellyfin.Plugin.JellyLinks.I18n;
 using Jellyfin.Plugin.JellyLinks.Library;
 using Jellyfin.Plugin.JellyLinks.Notify;
 using Jellyfin.Plugin.JellyLinks.Policy;
@@ -109,8 +110,11 @@ public sealed class FileGateTests : IDisposable
         Assert.Equal(GateOutcome.Forbidden, fourth.Outcome);
         var blocked = _t.Store.GetBatch(_batch)!;
         Assert.Equal(BatchStates.Blocked, blocked.State);
-        Assert.Equal("4 adresses distinctes (limite 3)", blocked.BlockedReason); // no address kept in the database
-        Assert.Contains(_sink.Events, e => e.Kind == EventKind.BatchBlocked && e.Detail.Contains("4.4.4.4", StringComparison.Ordinal));
+        var reason = Msg.Parse(blocked.BlockedReason);
+        Assert.Equal("ip_limit", reason.Code);
+        Assert.Equal("4", reason.Args["n"]);
+        Assert.DoesNotContain("4.4.4.4", blocked.BlockedReason!, StringComparison.Ordinal); // no address kept in the database
+        Assert.Contains(_sink.Events, e => e.Kind == EventKind.BatchBlocked && e.Detail.Args["ip"] == "4.4.4.4");
         Assert.Equal(3, _sink.Events.Count(e => e.Kind == EventKind.NewIp));
     }
 

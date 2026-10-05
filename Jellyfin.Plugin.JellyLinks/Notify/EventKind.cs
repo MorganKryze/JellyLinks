@@ -1,3 +1,5 @@
+using Jellyfin.Plugin.JellyLinks.I18n;
+
 namespace Jellyfin.Plugin.JellyLinks.Notify;
 
 public enum EventKind
@@ -20,4 +22,4 @@ public static class EventKinds
         k is EventKind.BatchBlocked or EventKind.NewIp or EventKind.QuotaReached or EventKind.BatchCompleted;
 }
 
-public sealed record LinkEvent(EventKind Kind, Guid UserId, string UserName, string BatchLabel, long BatchId, string Detail);
+public sealed record LinkEvent(EventKind Kind, Guid UserId, string UserName, string BatchLabel, long BatchId, Msg Detail);

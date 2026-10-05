@@ -10,10 +10,10 @@ public sealed class JellyfinActivitySink : IActivitySink
 
     public JellyfinActivitySink(IActivityManager activity) => _activity = activity;
 
-    public Task WriteAsync(LinkEvent e) =>
-        _activity.CreateAsync(new ActivityLog($"JellyLinks : {WebhookFormatter.Title(e.Kind)} — {e.BatchLabel}", "JellyLinks", e.UserId)
+    public Task WriteAsync(LinkEvent e, string lang) =>
+        _activity.CreateAsync(new ActivityLog($"{WebhookFormatter.Title(lang, e.Kind)} — {e.BatchLabel}", "JellyLinks", e.UserId)
         {
-            ShortOverview = e.Detail,
+            ShortOverview = e.Detail.Render(lang, "ev."),
             LogSeverity = e.Kind is EventKind.BatchBlocked or EventKind.QuotaReached ? LogLevel.Warning : LogLevel.Information,
         });
 }

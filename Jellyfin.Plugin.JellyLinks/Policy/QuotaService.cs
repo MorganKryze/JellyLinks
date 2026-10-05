@@ -47,4 +47,17 @@ public sealed class QuotaService
         var used = _store.GetUsageSince(userId, today - period + 1);
         return new QuotaStatus(q, used, _store.CountActiveBatches(userId, now));
     }
+
+    /// <summary>When an exhausted volume quota gets room again: the day the oldest counted day leaves the rolling window.</summary>
+    public long? FreesAt(Guid userId, QuotaStatus q)
+    {
+        if (!q.VolumeExhausted)
+        {
+            return null;
+        }
+
+        var today = _clock.GetUtcNow().ToUnixTimeSeconds() / 86_400;
+        var period = Math.Max(1, q.Quota.PeriodDays);
+        return _store.FirstUsageDay(userId, today - period + 1) is long first ? (first + period) * 86_400L : null;
+    }
 }

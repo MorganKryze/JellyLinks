@@ -52,4 +52,12 @@ public class SettingsRulesTests
         Assert.NotEmpty(SettingsRules.Validate(Valid() with { PublicBaseUrl = null! }));
         Assert.NotEmpty(SettingsRules.Validate(Valid() with { WebhookFormat = null! }));
     }
+
+    [Fact]
+    public void Errors_name_their_field_and_carry_a_code()
+    {
+        var errors = SettingsRules.Validate(Valid() with { LinkValidityDays = 0, PublicBaseUrl = "https://jellyfin.example/?x=1" });
+        Assert.Contains(errors, e => e.Field == "LinkValidityDays" && e.Error.Code == "range" && e.Error.Args["max"] == "365");
+        Assert.Contains(errors, e => e.Field == "PublicBaseUrl" && e.Error.Code == "plainUrl");
+    }
 }

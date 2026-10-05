@@ -1,5 +1,6 @@
 using System.Globalization;
 using Jellyfin.Plugin.JellyLinks.Data;
+using Jellyfin.Plugin.JellyLinks.I18n;
 using Jellyfin.Plugin.JellyLinks.Notify;
 using Jellyfin.Plugin.JellyLinks.Policy;
 using Jellyfin.Plugin.JellyLinks.Serving;
@@ -125,7 +126,7 @@ public sealed class FileController : ControllerBase
         if (completed && !batch.CompletedNotified && _store.AllLinksComplete(batch.Id) && _store.MarkCompletedNotified(batch.Id))
         {
             await _notifier.PublishAsync(new LinkEvent(EventKind.BatchCompleted, batch.UserId, _library.UserName(batch.UserId),
-                batch.Label, batch.Id, $"{_store.GetLinks(batch.Id).Count} fichiers reçus en entier")).ConfigureAwait(false);
+                batch.Label, batch.Id, Msg.Of("completed", ("n", _store.GetLinks(batch.Id).Count)))).ConfigureAwait(false);
         }
     }
 }
