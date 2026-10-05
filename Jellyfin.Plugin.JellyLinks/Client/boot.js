@@ -41,7 +41,7 @@
       if (!(r[0] && r[1])) { if (b) { b.remove(); } return; }
       if (!b) {
         b = JL.el('button', {
-          type: 'button', className: 'button-flat detailButton emby-button jlDetailBtn', title: 'Liens de téléchargement', attrs: { is: 'emby-button' },
+          type: 'button', className: 'button-flat detailButton emby-button jlDetailBtn', title: JL.t('gen.title'), attrs: { is: 'emby-button' },
           on: { click: function () { JL.openGenerate([b.getAttribute('data-item-id')]); } }
         }, [JL.el('div', { className: 'detailButton-content' }, [JL.icon('link', 'detailButton-icon')])]);
         box.insertBefore(b, box.querySelector('.btnMoreCommands'));
@@ -103,7 +103,7 @@
       var b = tpl.cloneNode(true);
       b.setAttribute('data-id', 'jellylinks');
       var text = b.querySelector('.actionSheetItemText');
-      if (text) { text.textContent = 'Liens de téléchargement'; }
+      if (text) { text.textContent = JL.t('gen.title'); }
       var ic = b.querySelector('.actionsheetMenuItemIcon');
       if (ic) { ic.className = 'actionsheetMenuItemIcon listItemIcon listItemIcon-transparent material-icons link'; }
       // Do not stop the event: the sheet closes itself and Jellyfin ignores the unknown id.
@@ -111,7 +111,9 @@
         var ids2 = multi ? selectedIds() : [single];
         if (ids2.length) { JL.afterSheetClose(window, function () { JL.openGenerate(ids2); }, 300); }
       });
-      scroller.appendChild(b);
+      // Next to Jellyfin's own download entries when the menu has them.
+      var anchor = scroller.querySelector('.actionSheetMenuItem[data-id="download"]') || scroller.querySelector('.actionSheetMenuItem[data-id="copy-stream"]');
+      if (anchor && anchor.nextSibling) { scroller.insertBefore(b, anchor.nextSibling); } else { scroller.appendChild(b); }
       keepInView(sheet);
     });
   }
@@ -153,7 +155,7 @@
     a.classList.add(cls);
     a.removeAttribute('data-itemid');
     a.setAttribute('href', '#');
-    setLabel(a, 'Mes liens', 'link');
+    setLabel(a, JL.t('mine.title'), 'link');
     a.addEventListener('click', openMyLinks);
     tpl.parentNode.insertBefore(a, tpl.nextSibling);
   }
