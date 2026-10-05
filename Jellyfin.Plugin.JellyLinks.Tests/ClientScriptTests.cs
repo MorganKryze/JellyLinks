@@ -16,4 +16,14 @@ public class ClientScriptTests
         Assert.Equal(positions.OrderBy(p => p), positions);
         Assert.Equal("boot.js", ClientScript.Parts[^1]);
     }
+
+    [Fact]
+    public void The_dictionary_comes_first()
+    {
+        var script = ClientScript.Load(new[] { "core.js" });
+        Assert.StartsWith("(window.JellyLinks = window.JellyLinks || {}).STRINGS = {", script, StringComparison.Ordinal);
+        Assert.Contains("\"gen.title\": \"Liens de téléchargement\"", script, StringComparison.Ordinal);
+        Assert.Contains("// JellyLinks client: core ", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("// JellyLinks client: boot ", script, StringComparison.Ordinal);
+    }
 }
