@@ -234,4 +234,35 @@ public class LinkStoreTests
         Assert.True(t.Store.Unblock(id));
         Assert.Equal(4, t.Store.GetBatch(id)!.IpLimitOverride);
     }
+
+    [Fact]
+    public void V3_keeps_old_batches_and_stores_the_scope_of_new_ones()
+    {
+        using var t = new TempStore(schema: 2);
+        var user = Guid.NewGuid();
+        var old = t.Store.CreateBatch(user, 100, 200, "Andor — Saison 2 · 3 fichiers · 8,0 Go", TempStore.AnySelection(Guid.NewGuid()),
+            new[] { TempStore.Video(Guid.NewGuid(), "a.mkv", 10) });
+        t.Store.Migrate();
+
+        Assert.Null(t.Store.GetBatch(old)!.Scope);
+        Assert.Equal("Andor — Saison 2 · 3 fichiers · 8,0 Go", t.Store.GetBatch(old)!.Label);
+
+        var scope = new BatchScope(new[] { new ScopeTitle("Andor", new[] { new ScopeSeason(2, new[] { 1, 2 }) }) });
+        var id = t.Store.CreateBatch(user, 100, 200, "Andor · Season 2 · E01–E02", TempStore.AnySelection(Guid.NewGuid()),
+            new[] { TempStore.Video(Guid.NewGuid(), "b.mkv", 10) }, scope);
+        var read = t.Store.GetBatch(id)!.Scope!;
+        Assert.Equal("Andor", read.Titles[0].Name);
+        Assert.Equal(new[] { 1, 2 }, read.Titles[0].Seasons[0].Episodes);
+        Assert.Equal(scope.Title("fr"), t.Store.GetBatchRow(id, 150)!.Scope!.Title("fr"));
+    }
+
+    [Fact]
+    public void Search_also_matches_a_title_inside_the_scope()
+    {
+        using var t = new TempStore();
+        var scope = new BatchScope(new[] { new ScopeTitle("Severance", Array.Empty<ScopeSeason>()) });
+        t.Store.CreateBatch(Guid.NewGuid(), 100, 10_000, "label without the name", TempStore.AnySelection(Guid.NewGuid()),
+            new[] { TempStore.Video(Guid.NewGuid(), "s.mkv", 10) }, scope);
+        Assert.Single(t.Store.SearchBatches(new BatchQuery("sever", null, null, null, null), 150));
+    }
 }

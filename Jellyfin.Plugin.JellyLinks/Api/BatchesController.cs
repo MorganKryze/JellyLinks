@@ -1,7 +1,7 @@
-using System.Globalization;
 using System.Security.Claims;
 using Jellyfin.Plugin.JellyLinks.Configuration;
 using Jellyfin.Plugin.JellyLinks.Data;
+using Jellyfin.Plugin.JellyLinks.I18n;
 using Jellyfin.Plugin.JellyLinks.Library;
 using Jellyfin.Plugin.JellyLinks.Notify;
 using Jellyfin.Plugin.JellyLinks.Policy;
@@ -27,34 +27,8 @@ public sealed record PreviewResponse(IReadOnlyList<FileView> Files, long TotalBy
 
 public sealed record LinkView(string FileName, long Size, string Kind, string Url, string Status, long BytesReceived);
 
-public sealed record BatchResponse(long Id, string Label, long CreatedAt, long ExpiresAt, string State,
+public sealed record BatchResponse(long Id, string Label, BatchScope? Scope, long CreatedAt, long ExpiresAt, string State,
     int FileCount, long TotalBytes, int CompleteCount, IReadOnlyList<LinkView> Links);
-
-public static class BatchLabel
-{
-    public static string For(IReadOnlyList<ResolvedFile> files)
-    {
-        var fr = CultureInfo.GetCultureInfo("fr-FR");
-        var total = files.Sum(f => f.Size);
-        var count = files.Count;
-        var tail = string.Format(fr, "{0} fichier{1} · {2:0.0} Go", count, count > 1 ? "s" : string.Empty, total / 1e9);
-
-        var titles = files.Select(f => f.Title).Distinct().ToList();
-        if (titles.Count == 1)
-        {
-            var seasons = files.Where(f => f.SeasonNumber is not null).Select(f => f.SeasonNumber!.Value).Distinct().ToList();
-            var head = seasons.Count switch
-            {
-                0 => titles[0],
-                1 => $"{titles[0]} — Saison {seasons[0]}",
-                _ => $"{titles[0]} — {seasons.Count} saisons",
-            };
-            return $"{head} · {tail}";
-        }
-
-        return $"{string.Join(", ", titles.Take(3))}{(titles.Count > 3 ? "…" : string.Empty)} · {tail}";
-    }
-}
 
 [ApiController]
 [Route("JellyLinks/batches")]
@@ -68,9 +42,11 @@ public sealed class BatchesController : ControllerBase
     private readonly TimeProvider _clock;
     private readonly Notifier _notifier;
     private readonly SigningKey _key;
+    private readonly ServerLanguage _language;
 
     public BatchesController(LinkStore store, ILibraryGateway library, QuotaService quotas,
-                             Func<PluginConfiguration> config, TimeProvider clock, Notifier notifier, SigningKey key)
+                             Func<PluginConfiguration> config, TimeProvider clock, Notifier notifier, SigningKey key,
+                             ServerLanguage language)
     {
         _store = store;
         _library = library;
@@ -79,6 +55,7 @@ public sealed class BatchesController : ControllerBase
         _clock = clock;
         _notifier = notifier;
         _key = key;
+        _language = language;
     }
 
     private Guid UserId => Guid.Parse(User.FindFirstValue("Jellyfin-UserId")!);
@@ -167,9 +144,11 @@ public sealed class BatchesController : ControllerBase
         }
 
         var now = Now;
-        var label = BatchLabel.For(files);
+        var scope = BatchScope.From(files);
+        var label = scope.Title(_language.Current);
         var id = _store.CreateBatch(UserId, now, now + (_config().LinkValidityDays * 86_400L), label, selection,
-            files.Select(f => new LinkRecord(0, 0, f.ItemId, f.MediaSourceId, f.FileName, f.Size, f.Kind, f.StreamIndex, f.Title, f.Fallback)).ToList());
+            files.Select(f => new LinkRecord(0, 0, f.ItemId, f.MediaSourceId, f.FileName, f.Size, f.Kind, f.StreamIndex, f.Title, f.Fallback)).ToList(),
+            scope);
         _ = _notifier.PublishAsync(new LinkEvent(EventKind.BatchCreated, UserId, _library.UserName(UserId), label, id,
             $"{files.Count} fichier{(files.Count > 1 ? "s" : string.Empty)}"));
         return ToResponse(_store.GetBatch(id)!);
@@ -195,7 +174,8 @@ public sealed class BatchesController : ControllerBase
             views.Add(new LinkView(l.FileName, l.Size, l.Kind, url, status, ByteRanges.CoveredBytes(l.Covered)));
         }
 
-        return new BatchResponse(b.Id, b.Label, b.CreatedAt, b.ExpiresAt, state, links.Count, links.Sum(l => l.Size), complete, views);
+        return new BatchResponse(b.Id, BatchScope.Display(b.Label, b.Scope), b.Scope, b.CreatedAt, b.ExpiresAt, state,
+            links.Count, links.Sum(l => l.Size), complete, views);
     }
 
     private static QuotaView ToView(QuotaStatus q) =>

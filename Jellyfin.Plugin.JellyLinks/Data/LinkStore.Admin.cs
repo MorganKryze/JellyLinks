@@ -15,7 +15,8 @@ public sealed partial class LinkStore
                (SELECT COUNT(*) FROM links l WHERE l.batch_id = b.id),
                (SELECT COUNT(*) FROM links l WHERE l.batch_id = b.id AND l.complete = 1),
                (SELECT COALESCE(SUM(l.size), 0) FROM links l WHERE l.batch_id = b.id),
-               (SELECT COUNT(*) FROM batch_ips i WHERE i.batch_id = b.id)
+               (SELECT COUNT(*) FROM batch_ips i WHERE i.batch_id = b.id),
+               b.scope
         FROM batches b
         """;
 
@@ -58,7 +59,7 @@ public sealed partial class LinkStore
             SELECT * FROM ({BatchRowSql}
               WHERE ($since IS NULL OR b.created_at >= $since)
                 AND ($user IS NULL OR b.user_id = $user)
-                AND ($like IS NULL OR b.label LIKE $like ESCAPE '\'
+                AND ($like IS NULL OR b.label LIKE $like ESCAPE '\' OR b.scope LIKE $like ESCAPE '\'
                      OR b.user_id IN (SELECT value FROM json_each($uids))
                      OR EXISTS (SELECT 1 FROM batch_ips i WHERE i.batch_id = b.id AND i.ip LIKE $like ESCAPE '\')))
             WHERE ($state IS NULL OR state = $state)
@@ -90,7 +91,7 @@ public sealed partial class LinkStore
     private static BatchRow ReadBatchRow(SqliteDataReader r) => new(
         r.GetInt64(0), Guid.Parse(r.GetString(1)), r.GetString(2), r.GetInt64(3), r.GetInt64(4), r.GetString(5),
         r.IsDBNull(6) ? null : r.GetString(6), r.IsDBNull(7) ? null : r.GetInt32(7),
-        r.GetInt32(8), r.GetInt32(9), r.GetInt64(10), r.GetInt32(11));
+        r.GetInt32(8), r.GetInt32(9), r.GetInt64(10), r.GetInt32(11), ReadScope(r, 12));
 
     private static SessionRow ReadSessionRow(SqliteDataReader r) => new(
         r.GetInt64(0), r.GetInt64(1), r.GetInt64(2), r.GetString(3), r.GetInt64(4), r.GetString(5), r.GetString(6),

@@ -21,7 +21,7 @@ public sealed record AdminBatch(BatchRow Batch, string UserName);
 
 public sealed record AdminBatchDetail(BatchRow Batch, string UserName, int IpLimit, IReadOnlyList<SessionRow> Sessions, IReadOnlyList<EventRow> Events);
 
-public sealed record ActivityEntry(long At, string Kind, Guid UserId, string UserName, long? BatchId, string? BatchLabel, string Detail);
+public sealed record ActivityEntry(long At, string Kind, Guid UserId, string UserName, long? BatchId, string? BatchLabel, BatchScope? BatchScope, string Detail);
 
 public sealed record AdminUser(Guid Id, string Name, bool CanDownload, bool IsAdmin, bool HasOverride, EffectiveQuota Quota,
     long UsedBytes, int ActiveBatches, long ArchivedBytes, int ArchivedCompleted);
@@ -63,6 +63,8 @@ public sealed class AdminController : ControllerBase
 
     private Dictionary<Guid, string> Names() => _library.Users().ToDictionary(u => u.Id, u => u.Name);
 
+    private static BatchRow Shown(BatchRow b) => b with { Label = BatchScope.Display(b.Label, b.Scope) };
+
     private static string NameOf(Dictionary<Guid, string> names, Guid id) => names.TryGetValue(id, out var n) ? n : id == Guid.Empty ? "administrateur" : id.ToString("N");
 
     private IReadOnlyList<Guid>? UsersMatching(string? text, Dictionary<Guid, string> names) =>
@@ -91,7 +93,7 @@ public sealed class AdminController : ControllerBase
     {
         var names = Names();
         return _store.SearchBatches(new BatchQuery(q, UsersMatching(q, names), string.IsNullOrEmpty(state) ? null : state, user, Since(days)), Now)
-            .Select(b => new AdminBatch(b, NameOf(names, b.UserId))).ToList();
+            .Select(b => new AdminBatch(Shown(b), NameOf(names, b.UserId))).ToList();
     }
 
     [HttpGet("batches/{id:long}")]
@@ -104,7 +106,7 @@ public sealed class AdminController : ControllerBase
         }
 
         var events = _store.ListEvents(new EventQuery(null, null, null, null, null, 1000)).Where(e => e.BatchId == id).ToList();
-        return new AdminBatchDetail(row, NameOf(Names(), row.UserId), row.IpLimitOverride ?? _config().IpLimit, _store.SessionsOfBatch(id), events);
+        return new AdminBatchDetail(Shown(row), NameOf(Names(), row.UserId), row.IpLimitOverride ?? _config().IpLimit, _store.SessionsOfBatch(id), events);
     }
 
     [HttpGet("batches/{id:long}/links")]
@@ -200,7 +202,7 @@ public sealed class AdminController : ControllerBase
                     || b.Label.Contains(q.Trim(), StringComparison.CurrentCultureIgnoreCase)
                     || NameOf(names, b.UserId).Contains(q.Trim(), StringComparison.CurrentCultureIgnoreCase))
                 {
-                    entries.Add(new ActivityEntry(s.LastAt, "Session", b.UserId, NameOf(names, b.UserId), b.Id, b.Label, detail));
+                    entries.Add(new ActivityEntry(s.LastAt, "Session", b.UserId, NameOf(names, b.UserId), b.Id, BatchScope.Display(b.Label, b.Scope), b.Scope, detail));
                 }
             }
         }
@@ -208,7 +210,7 @@ public sealed class AdminController : ControllerBase
         if (kind != "Session")
         {
             entries.AddRange(_store.ListEvents(new EventQuery(q, string.IsNullOrEmpty(kind) ? null : kind, user, since, UsersMatching(q, names)))
-                .Select(e => new ActivityEntry(e.At, e.Kind, e.UserId, NameOf(names, e.UserId), e.BatchId, e.BatchLabel, e.Detail)));
+                .Select(e => new ActivityEntry(e.At, e.Kind, e.UserId, NameOf(names, e.UserId), e.BatchId, e.BatchLabel is null ? null : BatchScope.Display(e.BatchLabel, e.BatchScope), e.BatchScope, e.Detail)));
         }
 
         return entries.OrderByDescending(e => e.At).Take(500).ToList();

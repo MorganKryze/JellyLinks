@@ -8,7 +8,7 @@ namespace Jellyfin.Plugin.JellyLinks.Data;
 /// <summary>The plugin's own SQLite database. Never jellyfin.db.</summary>
 public sealed partial class LinkStore
 {
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 3;
     private readonly string _connectionString;
 
     public LinkStore(string dbPath)
@@ -71,7 +71,7 @@ public sealed partial class LinkStore
         }
     }
 
-    private static readonly string[] Steps = { V1, V2 };
+    private static readonly string[] Steps = { V1, V2, V3 };
 
     private const string V1 = """
         CREATE TABLE batches (
@@ -152,15 +152,27 @@ public sealed partial class LinkStore
         CREATE INDEX ix_events_at ON events(at);
         """;
 
-    public long CreateBatch(Guid userId, long createdAt, long expiresAt, string label, Selection selection, IReadOnlyList<LinkRecord> links)
+    // v3: what a batch holds, as data (its title is rendered in each reader's language).
+    private const string V3 = """
+        ALTER TABLE batches ADD COLUMN scope TEXT;
+        """;
+
+    public long CreateBatch(Guid userId, long createdAt, long expiresAt, string label, Selection selection, IReadOnlyList<LinkRecord> links,
+                            BatchScope? scope = null)
     {
         using var c = Open();
         using var tx = c.BeginTransaction();
-        var id = (long)Scalar(c, """
-            INSERT INTO batches (user_id, created_at, expires_at, label, selection, state)
-            VALUES ($u, $c, $e, $l, $s, 'active') RETURNING id;
-            """, tx, ("$u", userId.ToString()), ("$c", createdAt), ("$e", expiresAt), ("$l", label),
-            ("$s", JsonSerializer.Serialize(selection)))!;
+        var id = scope is null
+            ? (long)Scalar(c, """
+                INSERT INTO batches (user_id, created_at, expires_at, label, selection, state)
+                VALUES ($u, $c, $e, $l, $s, 'active') RETURNING id;
+                """, tx, ("$u", userId.ToString()), ("$c", createdAt), ("$e", expiresAt), ("$l", label),
+                ("$s", JsonSerializer.Serialize(selection)))!
+            : (long)Scalar(c, """
+                INSERT INTO batches (user_id, created_at, expires_at, label, selection, state, scope)
+                VALUES ($u, $c, $e, $l, $s, 'active', $sc) RETURNING id;
+                """, tx, ("$u", userId.ToString()), ("$c", createdAt), ("$e", expiresAt), ("$l", label),
+                ("$s", JsonSerializer.Serialize(selection)), ("$sc", JsonSerializer.Serialize(scope)))!;
         foreach (var l in links)
         {
             Exec(c, """
@@ -396,17 +408,17 @@ public sealed partial class LinkStore
 
     public IReadOnlyList<EventRow> ListEvents(EventQuery q) =>
         Query("""
-            SELECT e.id, e.at, e.kind, e.user_id, e.batch_id, b.label, e.detail
+            SELECT e.id, e.at, e.kind, e.user_id, e.batch_id, b.label, e.detail, b.scope
             FROM events e LEFT JOIN batches b ON b.id = e.batch_id
             WHERE ($kind IS NULL OR e.kind = $kind)
               AND ($user IS NULL OR e.user_id = $user)
               AND ($since IS NULL OR e.at >= $since)
-              AND ($like IS NULL OR e.detail LIKE $like ESCAPE '\' OR b.label LIKE $like ESCAPE '\'
+              AND ($like IS NULL OR e.detail LIKE $like ESCAPE '\' OR b.label LIKE $like ESCAPE '\' OR b.scope LIKE $like ESCAPE '\'
                    OR e.user_id IN (SELECT value FROM json_each($uids)))
             ORDER BY e.at DESC, e.id DESC LIMIT $limit;
             """,
             r => new EventRow(r.GetInt64(0), r.GetInt64(1), r.GetString(2), Guid.Parse(r.GetString(3)),
-                r.IsDBNull(4) ? null : r.GetInt64(4), r.IsDBNull(5) ? null : r.GetString(5), r.GetString(6)),
+                r.IsDBNull(4) ? null : r.GetInt64(4), r.IsDBNull(5) ? null : r.GetString(5), r.GetString(6), ReadScope(r, 7)),
             ("$kind", (object?)q.Kind ?? DBNull.Value), ("$user", (object?)q.UserId?.ToString() ?? DBNull.Value),
             ("$since", (object?)q.Since ?? DBNull.Value), ("$like", (object?)Like(q.Text) ?? DBNull.Value),
             ("$uids", Ids(q.TextUserIds)), ("$limit", q.Limit));
@@ -428,7 +440,7 @@ public sealed partial class LinkStore
     // --- plumbing ---------------------------------------------------------
 
     private const string BatchSql =
-        "SELECT id, user_id, created_at, expires_at, label, selection, state, blocked_reason, ip_limit_override, completed_notified FROM batches";
+        "SELECT id, user_id, created_at, expires_at, label, selection, state, blocked_reason, ip_limit_override, completed_notified, scope FROM batches";
 
     private const string LinkSql =
         "SELECT id, batch_id, item_id, media_source_id, file_name, size, kind, stream_index, title, fallback, covered, complete FROM links";
@@ -439,7 +451,10 @@ public sealed partial class LinkStore
     private static BatchRecord ReadBatch(SqliteDataReader r) => new(
         r.GetInt64(0), Guid.Parse(r.GetString(1)), r.GetInt64(2), r.GetInt64(3), r.GetString(4),
         JsonSerializer.Deserialize<Selection>(r.GetString(5))!, r.GetString(6),
-        r.IsDBNull(7) ? null : r.GetString(7), r.IsDBNull(8) ? null : r.GetInt32(8), r.GetInt64(9) == 1);
+        r.IsDBNull(7) ? null : r.GetString(7), r.IsDBNull(8) ? null : r.GetInt32(8), r.GetInt64(9) == 1, ReadScope(r, 10));
+
+    internal static BatchScope? ReadScope(SqliteDataReader r, int i) =>
+        r.IsDBNull(i) ? null : JsonSerializer.Deserialize<BatchScope>(r.GetString(i));
 
     private static LinkRecord ReadLink(SqliteDataReader r) => new(
         r.GetInt64(0), r.GetInt64(1), Guid.Parse(r.GetString(2)), r.GetString(3), r.GetString(4),
