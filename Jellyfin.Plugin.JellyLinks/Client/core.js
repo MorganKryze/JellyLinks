@@ -400,7 +400,7 @@
     '.jlTable td{display:flex;justify-content:space-between;gap:1em;border:0;padding:.15em 0}',
     '.jlTable td::before{content:attr(data-label);color:var(--jl-muted)}.jlTable td.jlChev{display:none}}',
     '.jlSr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}',
-    '.jlFieldError{color:var(--jl-bad-fg)}',
+    '.jlRoot .jlFieldError{color:var(--jl-bad-fg)}',
     ':where(.toastContainer){position:fixed;bottom:1.5em;left:1.5em;z-index:10000}',
     ':where(.jlToast){background:var(--jf-palette-SnackbarContent-bg,#323232);color:var(--jf-palette-SnackbarContent-color,#fff);padding:.8em 1.2em;border-radius:.3em;margin-top:.5em}',
     '@media (max-width:600px){.dialogContainer.jlTop{padding-top:0}}'
