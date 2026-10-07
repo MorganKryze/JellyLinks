@@ -12,9 +12,9 @@ JellyLinks never downloads anything itself and never transcodes: it serves your 
 
 ## Features
 
-The interface is in French.
+The interface is in English by default and follows the language set in Jellyfin. French is included; another language is one more object in `Jellyfin.Plugin.JellyLinks/Client/strings.json`, with the same keys.
 
-- **Links button** (« Liens de téléchargement », link icon) on movie, series, season and episode pages, in the "…" menus and in multi-selection.
+- **Links button** ("Download links", link icon) on movie, series, season and episode pages, in the "…" menus and in multi-selection.
 - **Pick what you need**: default version or all versions, external subtitles, whole seasons or single
   episodes, "unwatched only". Totals update as you tick.
 - **Copy the links or download a `.txt`**, one URL per line — straight into your download manager.
