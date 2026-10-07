@@ -367,6 +367,7 @@
     'border-bottom:1px solid var(--jl-divider);color:inherit;font:inherit;cursor:pointer;text-align:left}',
     '.jlExpand{flex:0 0 auto}',
     '.jlFooter{display:flex;gap:.5em;justify-content:flex-end;align-items:center;flex-wrap:wrap;box-sizing:border-box}',
+    '.jlFooter:empty{display:none}',
     '.jlHint{flex:1 1 100%;text-align:right}',
     '.jlBar{height:6px;background:var(--jl-divider);border-radius:3px;overflow:hidden;margin:.5em 0}',
     '.jlBar>i{display:block;height:100%;background:var(--jl-accent)}',
