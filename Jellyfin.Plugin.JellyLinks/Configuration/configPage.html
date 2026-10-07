@@ -205,6 +205,13 @@
   function statePill(state) { var x = STATE_TONES[state] || ['off', '']; return pill(x[0], x[1], t('state.' + state)); }
   function cell(label, content, cls) { return el('td', { className: cls || '', attrs: { 'data-label': label } }, [content]); }
   function ellipsis(text, full) { return el('span', { className: 'jlEllipsis', text: text, title: full || text }); }
+  /** An event's detail; a session keeps its full user agent as a tooltip (the text shows the short client). */
+  function detailCell(e) {
+    var c = cell(t('col.detail'), JL.msgText(e.Detail, 'ev.'));
+    var ua = e.Detail && e.Detail.Code === 'session' && e.Detail.Args && e.Detail.Args.ua;
+    if (ua) { c.title = ua; }
+    return c;
+  }
 
   /** A table that turns into a list on phones. Clickable tables get a chevron column. */
   function grid(head, rows, clickable) {
@@ -459,7 +466,7 @@
         ]);
       });
       var events = x.Events.map(function (e) {
-        return el('tr', null, [cell(t('col.when'), JL.formatWhen(e.At), 'jlNum'), cell(t('col.what'), t('kind.' + e.Kind)), cell(t('col.detail'), JL.msgText(e.Detail, 'ev.'))]);
+        return el('tr', null, [cell(t('col.when'), JL.formatWhen(e.At), 'jlNum'), cell(t('col.what'), t('kind.' + e.Kind)), detailCell(e)]);
       });
       d.content.replaceChildren(
         el('h3', { text: JL.batchTitle(b) }),
@@ -489,7 +496,7 @@
         cell(t('col.what'), t('kind.' + e.Kind)),
         cell(t('col.user'), e.UserName),
         cell(t('col.batch'), e.BatchLabel ? ellipsis(JL.batchTitle({ Label: e.BatchLabel, Scope: e.BatchScope })) : '—'),
-        cell(t('col.detail'), JL.msgText(e.Detail, 'ev.'))
+        detailCell(e)
       ], e.BatchId ? function () { showBatch(e.BatchId); } : null);
     });
     $('jl-activity').replaceChildren(grid([t('col.when'), t('col.what'), t('col.user'), t('col.batch'), t('col.detail')], rows, true));
