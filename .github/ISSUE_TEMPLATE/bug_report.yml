@@ -1,0 +1,94 @@
+name: Bug report
+description: Something isn't working as expected.
+labels: [bug]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening a bug report, check the Troubleshooting table in the README: a missing Known proxy or an inactive
+        JavaScript Injector explains most problems. **Never paste a download link or a token**: they grant access to your files.
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Prerequisites
+      options:
+        - label: JavaScript Injector 4.0+ is installed and active
+          required: true
+        - label: The user has "Allow media downloading" in their Jellyfin profile
+          required: true
+
+  - type: input
+    id: version_jellylinks
+    attributes:
+      label: JellyLinks version
+      placeholder: "e.g. 0.3.0"
+    validations:
+      required: true
+
+  - type: input
+    id: version_jellyfin
+    attributes:
+      label: Jellyfin server version
+      placeholder: "e.g. 10.11.10"
+    validations:
+      required: true
+
+  - type: input
+    id: client_browser
+    attributes:
+      label: Browser and download manager
+      placeholder: "e.g. Firefox 131 / JDownloader 2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: proxy
+    attributes:
+      label: Is Jellyfin behind a reverse proxy?
+      options:
+        - "No"
+        - "Yes, and it is listed in Dashboard → Networking → Known proxies"
+        - "Yes, but it is not listed in Known proxies"
+    validations:
+      required: true
+
+  - type: textarea
+    id: bug_description
+    attributes:
+      label: Describe the bug
+      description: What happened? What did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Click …
+        3. See …
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server log excerpt
+      description: Lines mentioning JellyLinks from the Jellyfin log, with any link or token removed.
+      render: text
+
+  - type: textarea
+    id: console_errors
+    attributes:
+      label: Browser console errors
+      description: DevTools → Console, if the problem is in the web interface.
+      render: text
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Drag and drop images here if they help.
