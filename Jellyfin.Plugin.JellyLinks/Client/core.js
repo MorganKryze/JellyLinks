@@ -360,7 +360,7 @@
     '.jlRow .checkboxContainer{margin:0}',
     '.jlRow .checkboxLabel,.jlEllipsis{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}',
     '.jlIndent{padding-left:2em}',
-    '.jlNum{white-space:nowrap;font-variant-numeric:tabular-nums}',
+    '.jlNum,.jlNum.fieldDescription{white-space:nowrap!important;font-variant-numeric:tabular-nums}',
     '.jlChips{display:flex;flex-wrap:wrap;gap:.5em;padding:.6em 0}',
     '.jlChips .emby-button,.jlActions .emby-button,.jlFooter .emby-button{margin:0;min-height:40px}',
     '.jlDisclose{display:flex;width:100%;align-items:center;justify-content:space-between;min-height:48px;padding:0;background:none;border:0;',
