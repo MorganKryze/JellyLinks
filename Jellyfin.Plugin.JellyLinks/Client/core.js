@@ -347,6 +347,7 @@
     '--jl-warn-fg:var(--jf-palette-Alert-warningColor,#ffa726);--jl-warn-bg:var(--jf-palette-Alert-warningStandardBg,rgba(255,167,38,.15));',
     '--jl-bad-fg:var(--jf-palette-Alert-errorColor,#ef5350);--jl-bad-bg:var(--jf-palette-Alert-errorStandardBg,rgba(198,40,40,.15));',
     '--jl-off-fg:var(--jf-palette-text-disabled,rgba(128,128,128,1));--jl-off-bg:var(--jf-palette-action-selected,rgba(128,128,128,.15))}',
+    '.jlRoot[hidden],.jlRoot [hidden]{display:none!important}',
     '.dialogContainer.jlTop{align-items:flex-start;padding-top:5vh;box-sizing:border-box}',
     '.jlDialog{width:min(640px,94vw);max-height:90vh;display:flex;flex-direction:column}',
     '.jlDialog.jlSmall{width:min(440px,94vw)}',
