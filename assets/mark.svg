@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+<rect width="512" height="512" rx="112" fill="#0D1124"/>
+<defs>
+  <linearGradient id="mark-g" gradientUnits="userSpaceOnUse" x1="-269.4" y1="0" x2="269.4" y2="0">
+    <stop offset="0" stop-color="#AA5CC3"/><stop offset="1" stop-color="#00A4DC"/>
+  </linearGradient>
+  <clipPath id="mark-top"><rect x="-78.6" y="-107.0" width="157.2" height="107.0"/></clipPath>
+  <clipPath id="mark-bottom"><rect x="-78.6" y="0" width="157.2" height="107.0"/></clipPath>
+  <mask id="mark-under-a" maskUnits="userSpaceOnUse" x="-305.4" y="-107.0" width="610.8" height="214.0">
+    <rect x="-305.4" y="-107.0" width="610.8" height="214.0" fill="#fff"/><path d="M-198.4,-71.0 H-28.4 A71.0,71.0 0 0 1 -28.4,71.0 H-198.4 A71.0,71.0 0 0 1 -198.4,-71.0 Z" fill="none" stroke="#000" stroke-width="49.0" clip-path="url(#mark-top)"/>
+  </mask>
+  <mask id="mark-under-b" maskUnits="userSpaceOnUse" x="-305.4" y="-107.0" width="610.8" height="214.0">
+    <rect x="-305.4" y="-107.0" width="610.8" height="214.0" fill="#fff"/><path d="M28.4,-71.0 H198.4 A71.0,71.0 0 0 1 198.4,71.0 H28.4 A71.0,71.0 0 0 1 28.4,-71.0 Z" fill="none" stroke="#000" stroke-width="49.0" clip-path="url(#mark-bottom)"/>
+  </mask>
+</defs>
+<g transform="translate(256.0,256.0) rotate(-45)" fill="none" stroke="url(#mark-g)" stroke-width="36">
+  <path d="M28.4,-71.0 H198.4 A71.0,71.0 0 0 1 198.4,71.0 H28.4 A71.0,71.0 0 0 1 28.4,-71.0 Z" mask="url(#mark-under-a)"/>
+  <path d="M-198.4,-71.0 H-28.4 A71.0,71.0 0 0 1 -28.4,71.0 H-198.4 A71.0,71.0 0 0 1 -198.4,-71.0 Z" mask="url(#mark-under-b)"/>
+</g>
+</svg>

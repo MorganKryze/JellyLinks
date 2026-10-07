@@ -55,3 +55,7 @@ jsinjector v:
 # Build the release ZIP locally (same script as the CI)
 package version:
 	scripts/package.sh {{version}}
+
+# Rebuild the logo, catalog image, README banner and social preview from assets/brand/
+brand:
+	assets/brand/build.sh
