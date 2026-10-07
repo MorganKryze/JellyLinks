@@ -275,3 +275,12 @@ test('a menu entry still opens when the menu never steps back', async () => {
   win.dispatchEvent(new Event('popstate'));
   assert.equal(opened, 1);
 });
+
+test('the typed confirmation word ignores case, accents and surrounding spaces', () => {
+  assert.equal(JL.sameWord('revoquer', 'RÉVOQUER'), true);
+  assert.equal(JL.sameWord('  Révoquer ', 'RÉVOQUER'), true);
+  assert.equal(JL.sameWord('REVOKE', 'REVOKE'), true);
+  assert.equal(JL.sameWord('revok', 'REVOKE'), false);
+  assert.equal(JL.sameWord('', ''), false);
+  assert.equal(JL.sameWord('   ', 'REVOKE'), false);
+});

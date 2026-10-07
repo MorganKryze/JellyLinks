@@ -562,7 +562,13 @@
     return { content: content, footer: footer, close: close, dialog: dialog };
   };
 
-  /** A small native confirmation. opts: title, text, ok, danger, typed (a word to type before the button wakes up). */
+  /** The same word once trimmed, without accents and in capitals: "revoquer" matches "RÉVOQUER". */
+  JL.sameWord = function (a, b) {
+    function norm(s) { return String(s == null ? '' : s).trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase(); }
+    return norm(a) !== '' && norm(a) === norm(b);
+  };
+
+  /** A small native confirmation. opts: title, text, ok, danger, typed (a word to type before the button wakes up; Enter presses it). */
   JL.confirm = function (opts) {
     return new Promise(function (resolve) {
       var answered = false, d;
@@ -572,7 +578,10 @@
       var nodes = [JL.el('p', { text: opts.text })];
       if (opts.typed) {
         var input = JL.el('input', { type: 'text', id: 'jlTyped', attrs: { is: 'emby-input', autocomplete: 'off' },
-          on: { input: function () { ok.disabled = input.value.trim() !== opts.typed; } } });
+          on: {
+            input: function () { ok.disabled = !JL.sameWord(input.value, opts.typed); },
+            keydown: function (e) { if (e.key === 'Enter' && !ok.disabled) { e.preventDefault(); ok.click(); } }
+          } });
         ok.disabled = true;
         nodes.push(JL.el('div', { className: 'inputContainer' }, [
           JL.el('label', { className: 'inputLabel', attrs: { 'for': 'jlTyped' }, text: JL.t('all.confirmLabel', { word: opts.typed }) }), input]));
