@@ -576,7 +576,12 @@
     syncQuota();
   }
 
-  function loadSettings() { return api('GET', 'settings').then(function (s) { globals = s; fillSettings(s); }); }
+  /** The form is filled once per page open and after a save: switching tabs keeps unsaved edits. */
+  var settingsFilled = false;
+  function loadSettings() {
+    if (settingsFilled) { return Promise.resolve(); }
+    return api('GET', 'settings').then(function (s) { globals = s; fillSettings(s); settingsFilled = true; });
+  }
 
   function readSettings() {
     return {
@@ -635,6 +640,8 @@
       var body = readSettings();
       api('POST', 'settings', body).then(function () {
         globals = body;
+        settingsFilled = false;
+        run(loadSettings());
         if (window.Dashboard && Dashboard.processPluginConfigurationUpdateResult) { Dashboard.processPluginConfigurationUpdateResult(); } else { JL.toast(t('set.saved')); }
       }, function (err) {
         var placed = err && Array.isArray(err.body) && fieldErrors(err.body, form);
@@ -680,6 +687,7 @@
     }).then(function (r) {
       setUsers(r[0]);
       globals = r[1];
+      settingsFilled = false;
       return selectTab(current);
     }).then(null, function (e) {
       if (JL) { showError(e); } else { $('jl-error').textContent = 'JellyLinks · ' + ((e && e.status) || 0); $('jl-error').hidden = false; }
