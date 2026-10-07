@@ -355,6 +355,7 @@
     '.jlDialog .formDialogContent{flex:1 1 auto;overflow-y:auto}',
     '.jlBody{padding-top:.5em;padding-bottom:1em}',
     '.jlRoot button:disabled{opacity:.3;cursor:default}',
+    '.jlRoot input:disabled,.jlRoot select:disabled,.jlRoot textarea:disabled{opacity:.5;cursor:default}',
     '.jlRow{display:flex;justify-content:space-between;align-items:center;gap:1em;min-height:2.8em;border-bottom:1px solid var(--jl-divider)}',
     '.jlRow>:first-child{min-width:0;flex:1 1 auto}',
     '.jlRow .checkboxContainer{margin:0}',
