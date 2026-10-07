@@ -28,9 +28,10 @@ public sealed class FileGate
     private readonly Notifier _notifier;
     private readonly Func<PluginConfiguration> _config;
     private readonly TimeProvider _clock;
+    private readonly ServerLanguage _language;
 
     public FileGate(LinkStore store, LinkSigner signer, ILibraryGateway library, QuotaService quotas,
-                    Notifier notifier, Func<PluginConfiguration> config, TimeProvider clock)
+                    Notifier notifier, Func<PluginConfiguration> config, TimeProvider clock, ServerLanguage language)
     {
         _store = store;
         _signer = signer;
@@ -39,6 +40,7 @@ public sealed class FileGate
         _notifier = notifier;
         _config = config;
         _clock = clock;
+        _language = language;
     }
 
     public async Task<GateResult> CheckAsync(string token, string ip, bool isHead)
@@ -134,5 +136,5 @@ public sealed class FileGate
     private static GateResult Deny(GateOutcome o, LinkRecord? l = null, BatchRecord? b = null) => new(o, l, b, null, false);
 
     private Task Publish(EventKind kind, BatchRecord batch, Msg detail) =>
-        _notifier.PublishAsync(new LinkEvent(kind, batch.UserId, _library.UserName(batch.UserId), batch.Label, batch.Id, detail));
+        _notifier.PublishAsync(new LinkEvent(kind, batch.UserId, _library.UserName(batch.UserId), BatchScope.Now(batch, _language.Current), batch.Id, detail));
 }

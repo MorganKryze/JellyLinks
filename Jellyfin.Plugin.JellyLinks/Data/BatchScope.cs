@@ -21,6 +21,9 @@ public sealed record BatchScope(IReadOnlyList<ScopeTitle> Titles)
     /// <summary>The title to show: a 0.2.x label ("Andor — Saison 2 · 3 fichiers · 8,0 Go") loses its size tail.</summary>
     public static string Display(string label, BatchScope? scope) => scope is null ? label.Split(" · ")[0] : label;
 
+    /// <summary>The title of a batch in today's language: rendered from its scope, else the trimmed 0.2.x label.</summary>
+    public static string Now(BatchRecord batch, string lang) => batch.Scope is { } s ? s.Title(lang) : Display(batch.Label, null);
+
     public string Title(string lang)
     {
         if (Titles.Count == 0)

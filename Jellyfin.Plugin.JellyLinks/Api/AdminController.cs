@@ -162,7 +162,7 @@ public sealed class AdminController : ControllerBase
 
         var detail = limit is int l ? Msg.Of("unblocked_raised", ("limit", l)) : Msg.Of("unblocked");
 
-        _ = _notifier.PublishAsync(new LinkEvent(EventKind.BatchUnblocked, b.UserId, _library.UserName(b.UserId), b.Label, id, detail));
+        _ = _notifier.PublishAsync(new LinkEvent(EventKind.BatchUnblocked, b.UserId, _library.UserName(b.UserId), BatchScope.Now(b, _language.Current), id, detail));
         return NoContent();
     }
 
@@ -178,7 +178,7 @@ public sealed class AdminController : ControllerBase
         if (BatchStates.Effective(b.State, b.ExpiresAt, Now) is BatchStates.Active or BatchStates.Blocked)
         {
             _store.SetBatchState(id, BatchStates.Revoked, Msg.Of("revoked_admin").Serialize());
-            _ = _notifier.PublishAsync(new LinkEvent(EventKind.BatchRevoked, b.UserId, _library.UserName(b.UserId), b.Label, id, Msg.Of("revoked_admin")));
+            _ = _notifier.PublishAsync(new LinkEvent(EventKind.BatchRevoked, b.UserId, _library.UserName(b.UserId), BatchScope.Now(b, _language.Current), id, Msg.Of("revoked_admin")));
         }
 
         return NoContent();

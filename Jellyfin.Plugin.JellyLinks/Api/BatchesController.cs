@@ -109,7 +109,7 @@ public sealed class BatchesController : ControllerBase
         if (BatchStates.Effective(b.State, b.ExpiresAt, Now) == BatchStates.Active)
         {
             _store.SetBatchState(id, BatchStates.Revoked, Msg.Of("revoked_user").Serialize());
-            _ = _notifier.PublishAsync(new LinkEvent(EventKind.BatchRevoked, UserId, _library.UserName(UserId), b.Label, b.Id, Msg.Of("revoked_user")));
+            _ = _notifier.PublishAsync(new LinkEvent(EventKind.BatchRevoked, UserId, _library.UserName(UserId), BatchScope.Now(b, _language.Current), b.Id, Msg.Of("revoked_user")));
         }
 
         return NoContent();

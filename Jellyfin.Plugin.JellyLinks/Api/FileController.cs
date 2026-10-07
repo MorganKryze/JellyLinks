@@ -24,14 +24,17 @@ public sealed class FileController : ControllerBase
     private readonly LinkStore _store;
     private readonly Notifier _notifier;
     private readonly Library.ILibraryGateway _library;
+    private readonly ServerLanguage _language;
 
-    public FileController(FileGate gate, SessionTracker tracker, LinkStore store, Notifier notifier, Library.ILibraryGateway library)
+    public FileController(FileGate gate, SessionTracker tracker, LinkStore store, Notifier notifier, Library.ILibraryGateway library,
+                          ServerLanguage language)
     {
         _gate = gate;
         _tracker = tracker;
         _store = store;
         _notifier = notifier;
         _library = library;
+        _language = language;
     }
 
     [HttpGet("{token}/{name}")]
@@ -126,7 +129,7 @@ public sealed class FileController : ControllerBase
         if (completed && !batch.CompletedNotified && _store.AllLinksComplete(batch.Id) && _store.MarkCompletedNotified(batch.Id))
         {
             await _notifier.PublishAsync(new LinkEvent(EventKind.BatchCompleted, batch.UserId, _library.UserName(batch.UserId),
-                batch.Label, batch.Id, Msg.Of("completed", ("n", _store.GetLinks(batch.Id).Count)))).ConfigureAwait(false);
+                BatchScope.Now(batch, _language.Current), batch.Id, Msg.Of("completed", ("n", _store.GetLinks(batch.Id).Count)))).ConfigureAwait(false);
         }
     }
 }

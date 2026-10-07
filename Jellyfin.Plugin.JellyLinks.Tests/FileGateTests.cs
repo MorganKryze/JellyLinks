@@ -26,13 +26,15 @@ public sealed class FileGateTests : IDisposable
     private readonly long _batch;
     private readonly LinkRecord _link;
     private readonly string _file = Path.Combine(Path.GetTempPath(), $"jl-{Guid.NewGuid():N}.mkv");
+    private string? _culture = "en-US";
 
     public FileGateTests()
     {
         File.WriteAllBytes(_file, new byte[1000]);
         _lib.Path = _file;
         var notifier = new Notifier(_sink, new NoHttp(), () => _cfg, NullLogger<Notifier>.Instance);
-        _gate = new FileGate(_t.Store, _signer, _lib, new QuotaService(_t.Store, () => _cfg, _clock), notifier, () => _cfg, _clock);
+        _gate = new FileGate(_t.Store, _signer, _lib, new QuotaService(_t.Store, () => _cfg, _clock), notifier, () => _cfg, _clock,
+            new ServerLanguage(() => _culture));
         var item = Guid.NewGuid();
         _batch = _t.Store.CreateBatch(User, 1_800_000_000, 1_800_000_000 + 3600, "Film", TempStore.AnySelection(item),
             new[] { TempStore.Video(item, "a.mkv", 1000) });
@@ -235,6 +237,28 @@ public sealed class FileGateTests : IDisposable
         Assert.Equal(GateOutcome.Gone, (await _gate.CheckAsync(Token(), "1.1.1.1", false)).Outcome);
         _lib.MovedTo = MovedTo(Path.Combine(Path.GetTempPath(), $"jl-{Guid.NewGuid():N}.mkv"));
         Assert.Equal(GateOutcome.Gone, (await _gate.CheckAsync(Token(), "1.1.1.1", false)).Outcome);
+    }
+
+    [Fact]
+    public async Task An_alert_on_a_0_2_batch_carries_its_label_without_the_size_tail()
+    {
+        var item = Guid.NewGuid();
+        var old = _t.Store.CreateBatch(User, 1_800_000_000, 1_800_000_000 + 3600, "Sample Film · 1 fichier · 0,4 Go", TempStore.AnySelection(item),
+            new[] { TempStore.Video(item, "b.mkv", 1000) });
+        await _gate.CheckAsync(_signer.Sign(_t.Store.GetLinks(old)[0].Id, 1_800_000_000 + 3600), "1.1.1.1", false);
+        Assert.Equal("Sample Film", Assert.Single(_sink.Events, e => e.Kind == EventKind.NewIp).BatchLabel);
+    }
+
+    [Fact]
+    public async Task An_alert_on_a_scoped_batch_carries_its_title_in_the_current_language()
+    {
+        var item = Guid.NewGuid();
+        var scope = new BatchScope(new[] { new ScopeTitle("Andor", new[] { new ScopeSeason(2, new[] { 1 }) }) });
+        var made = _t.Store.CreateBatch(User, 1_800_000_000, 1_800_000_000 + 3600, "Andor · Saison 2 · E01", TempStore.AnySelection(item),
+            new[] { TempStore.Video(item, "c.mkv", 1000) }, scope);
+        _culture = "en-US"; // stored in French, alerted after the server switched to English
+        await _gate.CheckAsync(_signer.Sign(_t.Store.GetLinks(made)[0].Id, 1_800_000_000 + 3600), "1.1.1.1", false);
+        Assert.Equal("Andor · Season 2 · E01", Assert.Single(_sink.Events, e => e.Kind == EventKind.NewIp).BatchLabel);
     }
 
     private static LocatedFile MovedTo(string path)
