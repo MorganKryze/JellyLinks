@@ -28,6 +28,7 @@
   #JellyLinksConfigPage .jlCols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:1em}
   #JellyLinksConfigPage .jlPager{display:flex;align-items:center;gap:.6em;justify-content:flex-end}
   #JellyLinksConfigPage .jlDanger{border:1px solid var(--jl-bad-fg);border-radius:var(--jl-radius);padding:1em;margin-top:2em}
+  .jlDialog.jlWide:not(.jlFull){width:min(880px,94vw)}
   #JellyLinksConfigPage .jlInline,.jlDialog .jlInline{display:flex;flex-wrap:wrap;align-items:center;gap:.8em;margin:1em 0}
 </style>
 <div data-role="content">
@@ -415,6 +416,7 @@
 
   function showBatch(id) {
     var d = JL.openDialog(t('col.batch'));
+    d.dialog.classList.add('jlWide');
     d.content.replaceChildren(JL.spinner());
     d.footer.replaceChildren(JL.button(t('close'), 'cancel', d.close));
     function after(key) { JL.toast(t(key)); load(); run(loadBatches()); }
