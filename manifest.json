@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/MorganKryze/JellyLinks/main/assets/icon.png",
     "versions": [
       {
+        "version": "0.3.0.0",
+        "checksum": "9B7D4D1C6664321E962C42CD61D3CA8D",
+        "changelog": "JellyLinks now looks and speaks like Jellyfin.\r\n\r\n**For your users**\r\n- Download links, My links and every message follow the language set in Jellyfin: English by default, French included.\r\n- Built from Jellyfin's own controls, they follow your theme, built-in or custom (tested with ElegantFin and Novachromic).\r\n- The download links dialog says what happened: a clear done state after copying, errors with a way out, controls that\r\n  only appear when they change something, full screen on phones.\r\n- My links tells batches apart (what they hold, when they were made), keeps active links first, and confirms before revoking.\r\n\r\n**For you**\r\n- A rebuilt admin panel: a readable chart, tiles that open the matching batches, batch details and quota exceptions in\r\n  dialogs, lists that fit a phone, errors shown under the faulty setting.\r\n- Alerts to Jellyfin's activity log and to the webhook are written in the server's display language.\r\n- Jellyfin's activity log keeps JellyLinks alerts without client addresses; addresses stay in JellyLinks' own records for the retention period.\r\n- A new catalog image, a security policy and issue templates.\r\n\r\n**Upgrading**\r\n- Update from Dashboard → Plugins. The database gains one column; batches made by 0.2.x keep their title (without the size).\r\n\r\n**Requirements**\r\n- Jellyfin 10.11.10+ or 12.0.\r\n- JavaScript Injector 4.0+ (File Transformation is not needed).\r\n- Behind a reverse proxy, declare it in Dashboard → Networking → Known proxies.\r",
+        "targetAbi": "10.11.10.0",
+        "sourceUrl": "https://github.com/MorganKryze/JellyLinks/releases/download/v0.3.0/Jellyfin.Plugin.JellyLinks.zip",
+        "timestamp": "2026-10-08T19:02:11"
+      },
+      {
         "version": "0.2.1.0",
         "checksum": "9A5B48E2BD2D94053EF7B0E09E5CDE86",
         "changelog": "Bug fix release.\r\n\r\n**Fixed**\r\n- « Liens de téléchargement » in the \"…\" menus (detail page and cards) and in multi-selection now opens the links dialog. In 0.2.0 the dialog opened and closed in the same instant, so only the link button on the detail page worked.\r\n\r\nVerified on Jellyfin 10.11.10 and 12.0.0, desktop and phone layouts. Update from Dashboard → Plugins; no settings or data change.\r",
