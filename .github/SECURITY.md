@@ -18,18 +18,19 @@ to reproduce it, and what an attacker could do with it. You will get an answer w
   signed with HMAC-SHA256, expire (7 days by default), are checked on every request against the user's download
   permission and library access, and a batch used from more distinct addresses than allowed (3 by default) is blocked
   until an administrator releases it.
-- **The signing key** lives in `signing.key` in the plugin's data folder (owner-only permissions). It is never returned by
+- **The signing key** lives in `signing.key` in the plugin's data folder (owner-only permissions on Linux and macOS). It is never returned by
   any API, the plugin's or Jellyfin's. **Revoke everything** in the admin panel renews it: every link ever issued stops
   working.
 - **Addresses are recorded** for each download session, to enforce the address limit and show administrators who
-  downloaded what. Session details and events are kept for the retention period (90 days by default), then folded into
-  monthly totals without any address. Only administrators can see them.
+  downloaded what. They are kept in `jellylinks.db` for the retention period (90 days by default), then folded into
+  monthly totals without any address. Only administrators can see them. Jellyfin's activity log receives the alert
+  without the address; the webhook, if one is configured, receives it.
 - **Nothing leaves the server** except the alerts sent to the webhook, when one is configured.
 
 ## Endpoints that need no Jellyfin session
 
-- `GET /JellyLinks/f/…`: the signed file links themselves. Without a valid, unexpired signature they answer `404`,
-  `403` or `410` and serve nothing.
+- `GET` and `HEAD /JellyLinks/f/…`: the signed file links themselves. A link that cannot be served answers `404`, `403`
+  or `410` and serves nothing.
 - `GET /JellyLinks/client/core.js`: the static client code and its texts, for the admin page. It is the same code every
   browser already receives, and it holds no secret.
 

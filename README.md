@@ -64,8 +64,8 @@ unzip it into a `JellyLinks` folder inside Jellyfin's `plugins` directory, and r
 ## Uninstalling
 
 Uninstall from **Dashboard → Plugins**. The plugin's data stays in `plugins/Jellyfin.Plugin.JellyLinks/` (its database
-and signing key), so an update or a reinstall keeps your batches. Delete that folder to remove everything; otherwise a
-reinstall brings back the links that have not expired yet.
+and signing key), so an update or a reinstall keeps your batches. The settings live in `plugins/configurations/Jellyfin.Plugin.JellyLinks.xml`. Delete both the plugin folder and that
+file to remove everything JellyLinks stored; otherwise a reinstall brings back the links that have not expired yet.
 
 ## Using JellyLinks
 
@@ -112,13 +112,13 @@ On a phone, the dialog opens full screen like Jellyfin's own.
 
 ## Privacy and data
 
-| | |
+| Topic | Detail |
 | --- | --- |
 | **What is stored** | batches and their files; for each download session, the client's address, its user agent, times and bytes received; a log of events (batch created, new address, blocked, revoked…) |
-| **Where** | `jellylinks.db` in the plugin's folder, never in Jellyfin's own database |
+| **Where** | records in `jellylinks.db` in the plugin's folder; its alerts (new address, blocked, quota, completed) also appear in Jellyfin's activity log, without any address |
 | **For how long** | session details and events are kept for the retention period (90 days by default, Settings → Retention); sessions are then folded into monthly totals per user and title, without any address, and events are deleted |
 | **Who sees it** | administrators only, in the admin panel; users see their own batches and their progress |
-| **What leaves the server** | nothing, except the alerts you send to a webhook if you set one up |
+| **What leaves the server** | nothing, except webhook alerts if you set one up: they carry the user name, the title and, for address alerts, the client address |
 | **What JellyLinks never does** | geolocation, telemetry, changing or moving your files, transcoding |
 
 ## FAQ
@@ -187,6 +187,8 @@ just jsinjector v10
 just brand         # rebuild the logo and images from assets/brand/
 just package 0.3.0 # the release ZIP, as the CI builds it
 ```
+
+`just brand` needs python3 and rsvg-convert (librsvg).
 
 ## Security
 

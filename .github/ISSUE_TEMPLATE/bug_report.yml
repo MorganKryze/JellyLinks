@@ -36,6 +36,14 @@ body:
       required: true
 
   - type: input
+    id: version_jsinjector
+    attributes:
+      label: JavaScript Injector version
+      placeholder: "e.g. 4.0.0.0"
+    validations:
+      required: true
+
+  - type: input
     id: client_browser
     attributes:
       label: Browser and download manager
