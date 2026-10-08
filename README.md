@@ -116,7 +116,7 @@ On a phone, the dialog opens full screen like Jellyfin's own.
 | --- | --- |
 | **What is stored** | batches and their files; for each download session, the client's address, its user agent, times and bytes received; a log of events (batch created, new address, blocked, revoked…) |
 | **Where** | `jellylinks.db` in the plugin's folder, never in Jellyfin's own database |
-| **For how long** | session details and events are kept for the retention period (90 days by default, Settings → Retention), then folded into monthly totals per user and title, without any address |
+| **For how long** | session details and events are kept for the retention period (90 days by default, Settings → Retention); sessions are then folded into monthly totals per user and title, without any address, and events are deleted |
 | **Who sees it** | administrators only, in the admin panel; users see their own batches and their progress |
 | **What leaves the server** | nothing, except the alerts you send to a webhook if you set one up |
 | **What JellyLinks never does** | geolocation, telemetry, changing or moving your files, transcoding |
@@ -174,7 +174,7 @@ trust, and revoke a batch as soon as you no longer want it used.
 
 ## Project status
 
-JellyLinks is maintained and used every day on its author's server. It is tested on Jellyfin 10.11.10 and 12.0 with the
+JellyLinks is maintained and runs on its author's own server. It is tested on Jellyfin 10.11.10 and 12.0 with the
 web client, behind a reverse proxy, with JDownloader.
 
 ## Development
